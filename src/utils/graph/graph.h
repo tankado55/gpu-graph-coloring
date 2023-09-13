@@ -14,6 +14,8 @@ struct GraphStruct {
 	node_sz edgeSize{0};             // num of graph edges
 	node_sz* cumDegs{nullptr};       // cumsum of node degrees
 	node* neighs{nullptr};           // list of neighbors for all nodes (edges)
+	int* inCount{ nullptr };         // count of inbound arcs
+		
 
 	~GraphStruct() {delete[] neighs; delete[] cumDegs;}
 

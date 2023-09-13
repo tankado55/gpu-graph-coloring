@@ -25,8 +25,8 @@ int main(void) {
 	}
 
 	// GPU Luby-JP greedy coloring
-	Coloring* col = LubyGreedy(graphStruct);
-	printColoring(col, graphStruct, 1);
+	Coloring* coloring = LubyGreedy(graphStruct);
+	printColoring(coloring, graphStruct, 1);
 
 	return EXIT_SUCCESS;
 }

@@ -32,21 +32,7 @@ Coloring* LubyGreedy(GraphStruct* graphStruct) {
 	init <<< blocks, threads >>> (seed, states, weigths, n);
 	cudaDeviceSynchronize();
 	// start coloring (dyn. parall.)
-	//LubyJPcolorer <<< 1, 1 >>> (col, str, weigths);
-
-//#####################
-	// loop on CPU
-
-	// loop on ISs covering the graph
-	col->numOfColors = 0;
-	while (col->uncoloredNodes) {
-		col->uncoloredNodes = false;
-		col->numOfColors++;
-		findIS <<< blocks, threads >>> (col, graphStruct, weigths);
-		cudaDeviceSynchronize();
-	}
-	//#####################
-
+	LubyJPcolorer(col, graphStruct, weigths);
 
 	cudaFree(states);
 	cudaFree(weigths);
@@ -96,11 +82,21 @@ __global__ void init(uint seed, curandState_t* states, uint* numbers, uint n) {
 	numbers[idx] = curand(&states[idx]) % n * n;
 }
 
+__global__ void initLDF(GraphStruct* graphStruct, uint n) {
+	uint idx = blockIdx.x * blockDim.x + threadIdx.x;
+	if (idx >= n)
+		return;
+
+
+	curand_init(seed, idx, 0, &states[idx]);
+	numbers[idx] = curand(&states[idx]) % n * n;
+}
+
 
 /**
  * Luby IS & Jones−Plassmann colorer
  */
-__global__ void LubyJPcolorer(Coloring* col, GraphStruct* graphStruct, uint* weights) {
+void LubyJPcolorer(Coloring* col, GraphStruct* graphStruct, uint* weights) {
 	dim3 threads(THREADxBLOCK);
 	dim3 blocks((graphStruct->nodeSize + threads.x - 1) / threads.x, 1, 1);
 
@@ -110,10 +106,9 @@ __global__ void LubyJPcolorer(Coloring* col, GraphStruct* graphStruct, uint* wei
 		col->uncoloredNodes = false;
 		col->numOfColors++;
 		findIS <<< blocks, threads >>> (col, graphStruct, weights);
-		//cudaDeviceSynchronize();
+		cudaDeviceSynchronize();
 	}
 }
-
 
 
 /**
