@@ -87,6 +87,14 @@ __global__ void initLDF(GraphStruct* graphStruct, uint n) {
 	if (idx >= n)
 		return;
 
+	uint degree = graphStruct->cumDegs[idx + 1] - graphStruct->cumDegs[idx];
+
+	for (int i = 0; i < degree; ++i)
+	{
+		uint neighID = graphStruct->neighs[graphStruct->cumDegs[idx + i]];
+		graphStruct->inCount
+	}
+
 
 	curand_init(seed, idx, 0, &states[idx]);
 	numbers[idx] = curand(&states[idx]) % n * n;

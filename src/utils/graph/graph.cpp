@@ -12,14 +12,14 @@ using namespace std;
  * @param density probability of an edge (expected density)
  * @param eng seed
  */
-void Graph::setup(node_sz nn) {
+void Graph::setup(node_sz n) {
 	if (GPUEnabled)
-		memsetGPU(nn, string("nodes"));
+		memsetGPU(n, string("nodes"));
 	else {
 		graphStruct = new GraphStruct();
-		graphStruct->cumDegs = new node[nn + 1]{};  // starts by zero
+		graphStruct->cumDegs = new node[n + 1]{};  // starts by zero
 	}
-	graphStruct->nodeSize = nn;
+	graphStruct->nodeSize = n;
 }
 
 /**
