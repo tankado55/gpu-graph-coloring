@@ -4,6 +4,7 @@
 #include "coloring.h"
 #include "utils/graph/graph_d.h"
 #include "utils/common.h"
+#include <cooperative_groups.h>
 
 using namespace std;
 
@@ -14,7 +15,7 @@ Coloring* LubyGreedy(GraphStruct* graphStruct) {
 
 	Coloring* col;
 	CHECK(cudaMallocManaged(&col, sizeof(Coloring)));
-	uint n = graphStruct->nodeSize;
+	uint n = graphStruct->nodeCount;
 	col->uncoloredNodes = true;
 
 	// cudaMalloc for arrays of struct Coloring
@@ -27,7 +28,7 @@ Coloring* LubyGreedy(GraphStruct* graphStruct) {
 	cudaMalloc((void**)&states, n * sizeof(curandState_t));
 	cudaMalloc((void**)&weigths, n * sizeof(uint));
 	dim3 threads(THREADxBLOCK);
-	dim3 blocks((graphStruct->nodeSize + threads.x - 1) / threads.x, 1, 1);
+	dim3 blocks((graphStruct->nodeCount + threads.x - 1) / threads.x, 1, 1);
 	uint seed = 0;
 	init <<< blocks, threads >>> (seed, states, weigths, n);
 	cudaDeviceSynchronize();
@@ -45,7 +46,7 @@ Coloring* LubyGreedy(GraphStruct* graphStruct) {
 __global__ void findIS(Coloring* col, GraphStruct* graphStruct, uint* weights) {
 	uint idx = threadIdx.x + blockDim.x * blockIdx.x;
 
-	if (idx >= graphStruct->nodeSize)
+	if (idx >= graphStruct->nodeCount)
 		return;
 
 	if (col->coloring[idx])
@@ -92,12 +93,39 @@ __global__ void initLDF(GraphStruct* graphStruct, uint n) {
 	for (int i = 0; i < degree; ++i)
 	{
 		uint neighID = graphStruct->neighs[graphStruct->cumDegs[idx + i]];
-		graphStruct->inCount
+		uint neighDegree = graphStruct->cumDegs[neighID + 1] - graphStruct->cumDegs[neighID]; // ottimizzabile su CPU
+		if (degree > neighDegree)
+		{
+			atomicAdd(&graphStruct->inCount[neighID], 1);
+		}
+		else if (degree == neighDegree && idx > neighID)
+		{
+			atomicAdd(&graphStruct->inCount[neighID], 1);
+		}
 	}
+}
 
+void LDFColoring(GraphStruct* graphStruct)
+{
+	Coloring* coloring;
+	CHECK(cudaMallocManaged(&coloring, sizeof(Coloring)));
+	uint n = graphStruct->nodeCount;
+	coloring->uncoloredNodes = true;
 
-	curand_init(seed, idx, 0, &states[idx]);
-	numbers[idx] = curand(&states[idx]) % n * n;
+	// cudaMalloc for arrays of struct Coloring
+	CHECK(cudaMallocManaged(&(col->coloring), n * sizeof(uint)));
+	memset(coloring->coloring, 0, n);
+
+	dim3 threads(THREADxBLOCK);
+	dim3 blocks((graphStruct->nodeCount + threads.x - 1) / threads.x, 1, 1);
+
+	coloring->numOfColors = 0;
+	while (coloring->uncoloredNodes) {
+		coloring->uncoloredNodes = false;
+		coloring->numOfColors++;
+		findIS << < blocks, threads >> > (coloring, graphStruct);
+		cudaDeviceSynchronize();
+	}
 }
 
 
@@ -106,7 +134,7 @@ __global__ void initLDF(GraphStruct* graphStruct, uint n) {
  */
 void LubyJPcolorer(Coloring* col, GraphStruct* graphStruct, uint* weights) {
 	dim3 threads(THREADxBLOCK);
-	dim3 blocks((graphStruct->nodeSize + threads.x - 1) / threads.x, 1, 1);
+	dim3 blocks((graphStruct->nodeCount + threads.x - 1) / threads.x, 1, 1);
 
 	// loop on ISs covering the graph
 	col->numOfColors = 0;
@@ -124,7 +152,7 @@ void LubyJPcolorer(Coloring* col, GraphStruct* graphStruct, uint* weights) {
  * @param verbose print the complete graph
  */
 void printColoring(Coloring* col, GraphStruct* graphStruct, bool verbose) {
-	node n = graphStruct->nodeSize;
+	node n = graphStruct->nodeCount;
 	cout << "** Graph (num node: " << n << ", num edges: " << graphStruct->edgeSize << ")" << endl;
 	cout << "** Coloring (num colors: " << col->numOfColors << ")" << endl;
 	if (verbose) {

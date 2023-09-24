@@ -19,7 +19,7 @@ void Graph::setup(node_sz n) {
 		graphStruct = new GraphStruct();
 		graphStruct->cumDegs = new node[n + 1]{};  // starts by zero
 	}
-	graphStruct->nodeSize = n;
+	graphStruct->nodeCount = n;
 }
 
 /**
@@ -31,7 +31,7 @@ void Graph::randGraph(float prob, std::default_random_engine & eng) {
 		printf("[Graph] Warning: Probability not valid (set p = 0.5)!!\n");
 	}
 	uniform_real_distribution<> randR(0.0, 1.0);
-	node n = graphStruct->nodeSize;
+	node n = graphStruct->nodeCount;
 
 	// gen edges
 	vector<int>* edges = new vector<int>[n];
@@ -79,7 +79,7 @@ void Graph::randGraph(float prob, std::default_random_engine & eng) {
  * @param verbose print the complete graph
  */
 void Graph::print(bool verbose) {
-	node n = graphStruct->nodeSize;
+	node n = graphStruct->nodeCount;
 	cout << "** Graph (num node: " << n << ", num edges: " << graphStruct->edgeSize
 			<< ")" << endl;
 	cout << "         (min deg: " << minDeg << ", max deg: " << maxDeg

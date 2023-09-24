@@ -10,7 +10,7 @@ typedef unsigned int node_sz;  // graph node size
  * Base structure (array 1D format) of a graph
  */
 struct GraphStruct {
-	node_sz nodeSize{0};             // num of graph nodes
+	node_sz nodeCount{0};             // num of graph nodes
 	node_sz edgeSize{0};             // num of graph edges
 	node_sz* cumDegs{nullptr};       // cumsum of node degrees
 	node* neighs{nullptr};           // list of neighbors for all nodes (edges)

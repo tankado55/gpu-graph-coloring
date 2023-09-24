@@ -25,10 +25,10 @@ void Graph::memsetGPU(node_sz n, string memType) {
  * @param verbose print the complete graph
  */
 __global__ void print_d(GraphStruct* graphStruct, bool verbose) {
-	printf("** Graph (num node: %d, num edges: %d)\n", graphStruct->nodeSize,graphStruct->edgeSize);
+	printf("** Graph (num node: %d, num edges: %d)\n", graphStruct->nodeCount,graphStruct->edgeSize);
 
 	if (verbose) {
-		for (int i = 0; i < graphStruct->nodeSize; i++) {
+		for (int i = 0; i < graphStruct->nodeCount; i++) {
 			printf(" node(%d)[%d]-> ",i,graphStruct->cumDegs[i+1]-graphStruct->cumDegs[i]);
 			for (int j = 0; j < graphStruct->cumDegs[i+1] - graphStruct->cumDegs[i]; j++) {
 				printf("%d ", graphStruct->neighs[graphStruct->cumDegs[i]+j]);
