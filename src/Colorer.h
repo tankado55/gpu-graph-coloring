@@ -11,9 +11,10 @@
  */
 
 struct Coloring {
-	bool		uncoloredNodes;
-	uint		numOfColors;
+	bool uncoloredFlag;
+	uint numOfColors;
 	uint* coloring;   // each element denotes the color of the node at the correspondent index
+	bool* coloredNodes;
 };
 
 struct ColoringUtils {
@@ -25,7 +26,7 @@ class Colorer
 {
 private:
 
-	Coloring m_Coloring;
+	Coloring* m_Coloring;
 	GraphStruct* m_GraphStruct;
 
 public:

@@ -14,14 +14,16 @@ using namespace std;
 Colorer::Colorer(GraphStruct* graphStruct)
 {
 	m_GraphStruct = graphStruct;
-	CHECK(cudaMallocManaged((void **) &m_Coloring, sizeof(Coloring)));
-	m_Coloring.uncoloredNodes = true;
-	m_Coloring.numOfColors = 0;
+	CHECK(cudaMallocManaged(&m_Coloring, sizeof(Coloring)));
+	m_Coloring->uncoloredFlag = true;
+	m_Coloring->numOfColors = 0;
 
 	uint n = graphStruct->nodeCount;
 
-	CHECK(cudaMallocManaged(&m_Coloring.coloring, n * sizeof(uint)));
-	memset(m_Coloring.coloring, 0, n);
+	CHECK(cudaMallocManaged(&m_Coloring->coloring, n * sizeof(uint)));
+	memset(m_Coloring->coloring, 0, n * sizeof(uint));
+	CHECK(cudaMallocManaged(&m_Coloring->coloredNodes, n * sizeof(bool)));
+	memset(m_Coloring->coloredNodes, 0, n * sizeof(bool));
 }
 
 Colorer::~Colorer(){}
@@ -52,25 +54,23 @@ __global__ void initLDF(GraphStruct* graphStruct, uint n) {
 	}
 }
 
-__global__ void findISLDF(Coloring* col, GraphStruct* graphStruct, bool* bitmaps, int* bitmapIndex)
+__global__ void findISLDF(Coloring* coloring, GraphStruct* graphStruct, bool* bitmaps, int* bitmapIndex)
 {
 	uint idx = threadIdx.x + blockDim.x * blockIdx.x;
 
 	if (idx >= graphStruct->nodeCount) //é giusto
 		return;
 
-	if (col->coloring[idx])
+	if (coloring->coloredNodes[idx])
 		return;
 
-	printf("I'm %d, myInbound: %d\n", idx, graphStruct->inCounts[idx]);
+	printf("GPU - I'm %d, myInbound: %d\n", idx, graphStruct->inCounts[idx]);
 
 	uint offset = graphStruct->cumDegs[idx];
 	uint deg = graphStruct->cumDegs[idx + 1] - graphStruct->cumDegs[idx];
 
-	printf("I'm %d, myInbound: %d\n", idx, graphStruct->inCounts[idx]);
 	if (graphStruct->inCounts[idx] == 0) // Ready node
 	{
-		printf("I'm %d, ready!\n", idx);
 		int colorCount = bitmapIndex[idx + 1] - bitmapIndex[idx];
 		printf("I'm %d, total colors: %d\n", idx, colorCount);
 
@@ -84,15 +84,16 @@ __global__ void findISLDF(Coloring* col, GraphStruct* graphStruct, bool* bitmaps
 					//break;
 			}
 		}
-		col->coloring[idx] = bestColor;
-		printf("colored: %d, best color: %d: \n", idx, bestColor);
-		if (bestColor > col->numOfColors)
+		coloring->coloring[idx] = bestColor;
+		coloring->coloredNodes[idx] = true;
+		printf("colored: %d, best color: %d: \n", idx, coloring->coloring[idx]);
+		if (bestColor > coloring->numOfColors)
 		{
-			col->numOfColors = bestColor; // possibile race, potrei computarlo nella print
+			coloring->numOfColors = bestColor; // possibile race, potrei computarlo nella print
 		}
 		for (uint i = 0; i < deg; i++) {
 			uint neighID = graphStruct->neighs[offset + i];
-			if (!col->coloring[neighID])
+			if (!coloring->coloredNodes[neighID])
 			{
 				atomicAdd(&graphStruct->inCounts[neighID], -1);
 				bitmaps[bitmapIndex[neighID] + bestColor] = 0;
@@ -101,7 +102,7 @@ __global__ void findISLDF(Coloring* col, GraphStruct* graphStruct, bool* bitmaps
 	}
 	else
 	{
-		col->uncoloredNodes = true;
+		coloring->uncoloredFlag = true;
 	}
 }
 
@@ -113,15 +114,14 @@ Coloring* Colorer::LDFColoring()
 	// Init DAG calculating inCounts
 	initLDF <<<gridDim, blockDim>>> (m_GraphStruct, m_GraphStruct->nodeCount);
 	cudaDeviceSynchronize();
-	for (int i = 0; i < m_GraphStruct->nodeCount; ++i) {
-		std::cout << "node" << i << " inCount: " << m_GraphStruct->inCounts[i] << "\n";
-	}
 
 	// inizialize bitmaps
 	// Every node has a bitmap with a length of inbound edges + 1
 	bool* bitmaps;
-	CHECK(cudaMallocManaged(&(bitmaps), (m_GraphStruct->nodeCount + (int)(m_GraphStruct->edgeCount + 1)/2) * sizeof(bool)));
-	memset(bitmaps, 1, (m_GraphStruct->nodeCount + (int)(m_GraphStruct->edgeCount + 1) / 2) * sizeof(bool));
+	uint bitCount = (m_GraphStruct->nodeCount + (int)(m_GraphStruct->edgeCount + 1) / 2);
+	CHECK(cudaMallocManaged(&(bitmaps), bitCount * sizeof(bool)));
+	memset(bitmaps, 1, bitCount * sizeof(bool));
+
 	int* bitmapIndex;
 	CHECK(cudaMallocManaged(&(bitmapIndex), m_GraphStruct->nodeCount + 1 * sizeof(int)));
 
@@ -130,15 +130,15 @@ Coloring* Colorer::LDFColoring()
 		bitmapIndex[i] = bitmapIndex[i - 1] + m_GraphStruct->inCounts[i - 1] + 1;
 
 	uint iterationCount = 0;
-	while (m_Coloring.uncoloredNodes) {
-		m_Coloring.uncoloredNodes = false;
+	while (m_Coloring->uncoloredFlag) {
+		m_Coloring->uncoloredFlag = false;
 		iterationCount++;
-		printf("Sequential iteration: %d \n", iterationCount);
-		findISLDF <<< gridDim, blockDim >>> (&m_Coloring, m_GraphStruct, bitmaps, bitmapIndex);
+		printf("------------ Sequential iteration: %d \n", iterationCount);
+		findISLDF <<< gridDim, blockDim >>> (m_Coloring, m_GraphStruct, bitmaps, bitmapIndex);
 		cudaDeviceSynchronize();
 	}
 
-	return &m_Coloring;
+	return m_Coloring;
 }
 
 Coloring* RandomPriorityColoring(GraphStruct* graphStruct) {
@@ -147,7 +147,7 @@ Coloring* RandomPriorityColoring(GraphStruct* graphStruct) {
 	Coloring* col;
 	CHECK(cudaMallocManaged(&col, sizeof(Coloring)));
 	uint n = graphStruct->nodeCount;
-	col->uncoloredNodes = true;
+	col->uncoloredFlag = true;
 
 	// cudaMalloc for arrays of struct Coloring
 	CHECK(cudaMallocManaged(&(col->coloring), n * sizeof(uint)));
@@ -199,7 +199,7 @@ __global__ void findIS(Coloring* col, GraphStruct* graphStruct, uint* weights) {
 		col->coloring[idx] = col->numOfColors;
 	}
 	else
-		col->uncoloredNodes = true;
+		col->uncoloredFlag = true;
 }
 
 /**
@@ -227,8 +227,8 @@ void LubyJPcolorer(Coloring* col, GraphStruct* graphStruct, uint* weights) {
 
 	// loop on ISs covering the graph
 	col->numOfColors = 0;
-	while (col->uncoloredNodes) {
-		col->uncoloredNodes = false;
+	while (col->uncoloredFlag) {
+		col->uncoloredFlag = false;
 		col->numOfColors++;
 		findIS <<< blocks, threads >>> (col, graphStruct, weights);
 		cudaDeviceSynchronize();
@@ -243,9 +243,9 @@ void LubyJPcolorer(Coloring* col, GraphStruct* graphStruct, uint* weights) {
 void printColoring(Coloring* col, GraphStruct* graphStruct, bool verbose) {
 	node n = graphStruct->nodeCount;
 	cout << "** Graph (num node: " << n << ", num edges: " << graphStruct->edgeCount << ")" << endl;
-	cout << "** Coloring (num colors: " << col->numOfColors << ")" << endl;
+	cout << "** Coloring (num colors: " << col->numOfColors + 1 << ")" << endl;
 	if (verbose) {
-		for (uint i = 1; i <= col->numOfColors; i++) {
+		for (uint i = 0; i <= col->numOfColors; i++) {
 			cout << "   color(" << i << ")" << "-> ";
 			for (uint j = 0; j < n; j++)
 				if (col->coloring[j] == i)
