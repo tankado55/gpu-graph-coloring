@@ -11,7 +11,7 @@ using namespace std;
 
 #define THREADxBLOCK 128
 
-Colorer::Colorer(const GraphStruct* graphStruct)
+Colorer::Colorer(GraphStruct* graphStruct)
 {
 	m_GraphStruct = graphStruct;
 	CHECK(cudaMallocManaged((void **) &m_Coloring, sizeof(Coloring)));
@@ -20,9 +20,11 @@ Colorer::Colorer(const GraphStruct* graphStruct)
 
 	uint n = graphStruct->nodeCount;
 
-	CHECK(cudaMallocManaged(&(m_Coloring.coloring), n * sizeof(uint)));
+	CHECK(cudaMallocManaged(&m_Coloring.coloring, n * sizeof(uint)));
 	memset(m_Coloring.coloring, 0, n);
 }
+
+Colorer::~Colorer(){}
 
 __global__ void initLDF(GraphStruct* graphStruct, uint n) {
 	uint idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -50,12 +52,65 @@ __global__ void initLDF(GraphStruct* graphStruct, uint n) {
 	}
 }
 
+__global__ void findISLDF(Coloring* col, GraphStruct* graphStruct, bool* bitmaps, int* bitmapIndex)
+{
+	uint idx = threadIdx.x + blockDim.x * blockIdx.x;
+
+	if (idx >= graphStruct->nodeCount) //é giusto
+		return;
+
+	if (col->coloring[idx])
+		return;
+
+	printf("I'm %d, myInbound: %d\n", idx, graphStruct->inCounts[idx]);
+
+	uint offset = graphStruct->cumDegs[idx];
+	uint deg = graphStruct->cumDegs[idx + 1] - graphStruct->cumDegs[idx];
+
+	printf("I'm %d, myInbound: %d\n", idx, graphStruct->inCounts[idx]);
+	if (graphStruct->inCounts[idx] == 0) // Ready node
+	{
+		printf("I'm %d, ready!\n", idx);
+		int colorCount = bitmapIndex[idx + 1] - bitmapIndex[idx];
+		printf("I'm %d, total colors: %d\n", idx, colorCount);
+
+		int bestColor = colorCount;
+		for (int i = 0; i < colorCount; ++i)
+		{
+			if (bitmaps[bitmapIndex[idx] + i])
+			{
+				if (i < bestColor) //TODO: find another way
+					bestColor = i;
+					//break;
+			}
+		}
+		col->coloring[idx] = bestColor;
+		printf("colored: %d, best color: %d: \n", idx, bestColor);
+		if (bestColor > col->numOfColors)
+		{
+			col->numOfColors = bestColor; // possibile race, potrei computarlo nella print
+		}
+		for (uint i = 0; i < deg; i++) {
+			uint neighID = graphStruct->neighs[offset + i];
+			if (!col->coloring[neighID])
+			{
+				atomicAdd(&graphStruct->inCounts[neighID], -1);
+				bitmaps[bitmapIndex[neighID] + bestColor] = 0;
+			}
+		}
+	}
+	else
+	{
+		col->uncoloredNodes = true;
+	}
+}
+
 Coloring* Colorer::LDFColoring()
 {
-	// Init DAG calculating inCounts
 	dim3 blockDim(THREADxBLOCK);
 	dim3 gridDim((m_GraphStruct->nodeCount + blockDim.x - 1) / blockDim.x, 1, 1);
-
+	
+	// Init DAG calculating inCounts
 	initLDF <<<gridDim, blockDim>>> (m_GraphStruct, m_GraphStruct->nodeCount);
 	cudaDeviceSynchronize();
 	for (int i = 0; i < m_GraphStruct->nodeCount; ++i) {
@@ -63,29 +118,27 @@ Coloring* Colorer::LDFColoring()
 	}
 
 	// inizialize bitmaps
+	// Every node has a bitmap with a length of inbound edges + 1
 	bool* bitmaps;
-	CHECK(cudaMallocManaged(&(bitmaps), (m_GraphStruct->nodeCount + m_GraphStruct->edgeCount) * sizeof(bool)));
+	CHECK(cudaMallocManaged(&(bitmaps), (m_GraphStruct->nodeCount + (int)(m_GraphStruct->edgeCount + 1)/2) * sizeof(bool)));
+	memset(bitmaps, 1, (m_GraphStruct->nodeCount + (int)(m_GraphStruct->edgeCount + 1) / 2) * sizeof(bool));
 	int* bitmapIndex;
-	CHECK(cudaMallocManaged(&(bitmapIndex), m_GraphStruct->nodeCount * sizeof(int)));
+	CHECK(cudaMallocManaged(&(bitmapIndex), m_GraphStruct->nodeCount + 1 * sizeof(int)));
 
+	bitmapIndex[0] = 0;
+	for (int i = 1; i < m_GraphStruct->nodeCount + 1; i++)
+		bitmapIndex[i] = bitmapIndex[i - 1] + m_GraphStruct->inCounts[i - 1] + 1;
 
-
-
-	
-
-	
-
-	
 	uint iterationCount = 0;
-	while (coloring->uncoloredNodes) {
-		coloring->uncoloredNodes = false;
+	while (m_Coloring.uncoloredNodes) {
+		m_Coloring.uncoloredNodes = false;
 		iterationCount++;
 		printf("Sequential iteration: %d \n", iterationCount);
-		findISLDF << < blocks, threads >> > (coloring, graphStruct);
+		findISLDF <<< gridDim, blockDim >>> (&m_Coloring, m_GraphStruct, bitmaps, bitmapIndex);
 		cudaDeviceSynchronize();
 	}
 
-	return coloring;
+	return &m_Coloring;
 }
 
 Coloring* RandomPriorityColoring(GraphStruct* graphStruct) {
@@ -148,53 +201,6 @@ __global__ void findIS(Coloring* col, GraphStruct* graphStruct, uint* weights) {
 	else
 		col->uncoloredNodes = true;
 }
-
-__global__ void findISLDF(Coloring* col, GraphStruct* graphStruct) {
-	uint idx = threadIdx.x + blockDim.x * blockIdx.x;
-
-	if (idx >= graphStruct->nodeCount)
-		return;
-
-	if (col->coloring[idx])
-		return;
-
-	uint offset = graphStruct->cumDegs[idx];
-	uint deg = graphStruct->cumDegs[idx + 1] - graphStruct->cumDegs[idx];
-
-	if (graphStruct->inCounts[idx] == 0)
-	{
-		int bestColor;
-		//TODO: cicla su colore
-		
-		for (int i = 0; i < graphStruct->maxDeg + 1; ++i)
-		{
-			if (col->colorBitmaps[idx * (graphStruct->maxDeg + 1)+ i])
-			{
-				bestColor = i;
-				//break;
-			}
-		}
-		col->coloring[idx] = bestColor;
-		printf("colored: %d, best color: %d: \n", idx, bestColor);
-		if (bestColor > col->numOfColors)
-		{
-			col->numOfColors = bestColor; // possibile race, potrei computarlo nella print
-		}
-		for (uint i = 0; i < deg; i++) {
-			uint neighID = graphStruct->neighs[offset + i];
-			if (!col->coloring[neighID])
-			{
-				atomicAdd(&graphStruct->inCounts[neighID], -1);
-				col->colorBitmaps[neighID * (graphStruct->maxDeg + 1) + bestColor] = 0;
-			}
-		}
-	}
-	else
-	{
-		col->uncoloredNodes = true;
-	}
-}
-
 
 /**
  *  this GPU kernel takes an array of states, and an array of ints, and puts a random int into each

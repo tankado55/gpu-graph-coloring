@@ -14,7 +14,6 @@ struct Coloring {
 	bool		uncoloredNodes;
 	uint		numOfColors;
 	uint* coloring;   // each element denotes the color of the node at the correspondent index
-	bool* colorBitmaps;
 };
 
 struct ColoringUtils {
@@ -27,10 +26,10 @@ class Colorer
 private:
 
 	Coloring m_Coloring;
-	const GraphStruct* m_GraphStruct;
+	GraphStruct* m_GraphStruct;
 
 public:
-	Colorer(const GraphStruct*);
+	Colorer(GraphStruct*);
 	Coloring* LDFColoring();
 	~Colorer();
 };

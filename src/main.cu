@@ -1,5 +1,5 @@
 
-#include "coloring.h"
+#include "Colorer.h"
 #include "utils/common.h"
 #include <iostream>
 
@@ -25,9 +25,10 @@ int main(void) {
 	}
 
 	// GPU Luby-JP greedy coloring
-	Coloring* coloring = RandomPriorityColoring(graphStruct);
-	Coloring* coloring2 = LDFColoring(graphStruct);
-	printColoring(coloring, graphStruct, 1);
+	//Coloring* coloring = RandomPriorityColoring(graphStruct);
+	Colorer colorer(graphStruct);
+	Coloring* coloring2 = colorer.LDFColoring();
+	//printColoring(coloring, graphStruct, 1);
 	printColoring(coloring2, graphStruct, 1);
 
 	return EXIT_SUCCESS;
