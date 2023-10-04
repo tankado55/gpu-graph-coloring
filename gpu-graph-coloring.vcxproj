@@ -135,12 +135,12 @@
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <CudaCompile Include="src\coloring.cu" />
+    <CudaCompile Include="src\Colorer.cu" />
     <CudaCompile Include="src\main.cu" />
     <CudaCompile Include="src\utils\graph\graph_d.cu" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\coloring.h" />
+    <ClInclude Include="src\Colorer.h" />
     <ClInclude Include="src\utils\common.h" />
     <ClInclude Include="src\utils\graph\graph.h" />
     <ClInclude Include="src\utils\graph\graph_d.h" />

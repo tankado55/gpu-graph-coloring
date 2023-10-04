@@ -4,7 +4,7 @@
 #include <iostream>
 
 int main(void) {
-	unsigned int n = 128;		 // number of nodes for random graphs
+	unsigned int n = 8;		 // number of nodes for random graphs
 	float prob = .5;				    // density (percentage) for random graphs
 	std::default_random_engine engine{ 0 };  // fixed seed
 
@@ -25,8 +25,10 @@ int main(void) {
 	}
 
 	// GPU Luby-JP greedy coloring
-	Coloring* coloring = LubyGreedy(graphStruct);
+	Coloring* coloring = RandomPriorityColoring(graphStruct);
+	Coloring* coloring2 = LDFColoring(graphStruct);
 	printColoring(coloring, graphStruct, 1);
+	printColoring(coloring2, graphStruct, 1);
 
 	return EXIT_SUCCESS;
 }

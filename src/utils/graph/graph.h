@@ -11,10 +11,11 @@ typedef unsigned int node_sz;  // graph node size
  */
 struct GraphStruct {
 	node_sz nodeCount{0};             // num of graph nodes
-	node_sz edgeSize{0};             // num of graph edges
+	node_sz edgeCount{0};             // num of graph edges
 	node_sz* cumDegs{nullptr};       // cumsum of node degrees
 	node* neighs{nullptr};           // list of neighbors for all nodes (edges)
-	int* inCount{ nullptr };         // count of inbound arcs
+	int* inCounts{ nullptr };         // count of inbound arcs
+	unsigned int maxDeg;
 		
 
 	~GraphStruct() {delete[] neighs; delete[] cumDegs;}
@@ -28,10 +29,9 @@ struct GraphStruct {
 	}
 
 	// return the degree of node i
-	node_sz deg(node i) {
+	unsigned int deg(node i) {
 		return(cumDegs[i+1]-cumDegs[i]);
 	}
-
 };
 
 /**

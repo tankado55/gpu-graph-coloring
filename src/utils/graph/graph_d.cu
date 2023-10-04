@@ -13,10 +13,11 @@ void Graph::memsetGPU(node_sz n, string memType) {
 	if (!memType.compare("nodes")) {
 		CHECK(cudaMallocManaged(&graphStruct, sizeof(GraphStruct)));
 		CHECK(cudaMallocManaged(&(graphStruct->cumDegs), (n+1)*sizeof(node)));
-		CHECK(cudaMallocManaged(&(graphStruct->inCount), n * sizeof(uint)));
+		CHECK(cudaMallocManaged(&(graphStruct->inCounts), n * sizeof(uint)));
+		//CHECK(cudaMallocManaged(&(void**)(graphStruct->maxDeg), sizeof(uint)));
 	}
 	else if (!memType.compare("edges")) {
-		CHECK(cudaMallocManaged(&(graphStruct->neighs), graphStruct->edgeSize*sizeof(node)));
+		CHECK(cudaMallocManaged(&(graphStruct->neighs), graphStruct->edgeCount*sizeof(node)));
 	}
 }
 
@@ -25,7 +26,7 @@ void Graph::memsetGPU(node_sz n, string memType) {
  * @param verbose print the complete graph
  */
 __global__ void print_d(GraphStruct* graphStruct, bool verbose) {
-	printf("** Graph (num node: %d, num edges: %d)\n", graphStruct->nodeCount,graphStruct->edgeSize);
+	printf("** Graph (num node: %d, num edges: %d)\n", graphStruct->nodeCount,graphStruct->edgeCount);
 
 	if (verbose) {
 		for (int i = 0; i < graphStruct->nodeCount; i++) {

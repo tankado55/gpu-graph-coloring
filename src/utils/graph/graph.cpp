@@ -42,7 +42,7 @@ void Graph::randGraph(float prob, std::default_random_engine & eng) {
 				edges[j].push_back(i);
 				graphStruct->cumDegs[i + 1]++;
 				graphStruct->cumDegs[j + 1]++;
-				graphStruct->edgeSize += 2;
+				graphStruct->edgeCount += 2;
 			}
 	}
 	for (int i = 0; i < n; i++)
@@ -53,12 +53,15 @@ void Graph::randGraph(float prob, std::default_random_engine & eng) {
 	minDeg = n;
 	for (int i = 0; i < n; i++) {
 		if (graphStruct->deg(i) > maxDeg)
+		{
 			maxDeg = graphStruct->deg(i);
+			graphStruct->maxDeg = maxDeg;
+		}			
 		if (graphStruct->deg(i) < minDeg)
 			minDeg = graphStruct->deg(i);
 	}
-	density = (float) graphStruct->edgeSize / (float) (n * (n - 1));
-	meanDeg = (float) graphStruct->edgeSize / (float) n;
+	density = (float) graphStruct->edgeCount / (float) (n * (n - 1));
+	meanDeg = (float) graphStruct->edgeCount / (float) n;
 	if (minDeg == 0)
 		connected = false;
 	else
@@ -68,7 +71,7 @@ void Graph::randGraph(float prob, std::default_random_engine & eng) {
 	if (GPUEnabled)
 		memsetGPU(n,"edges");
 	else
-		graphStruct->neighs = new node[graphStruct->edgeSize] { };
+		graphStruct->neighs = new node[graphStruct->edgeCount] { };
 
 	for (int i = 0; i < n; i++)
 		memcpy((graphStruct->neighs + graphStruct->cumDegs[i]), edges[i].data(), sizeof(int) * edges[i].size());
@@ -80,7 +83,7 @@ void Graph::randGraph(float prob, std::default_random_engine & eng) {
  */
 void Graph::print(bool verbose) {
 	node n = graphStruct->nodeCount;
-	cout << "** Graph (num node: " << n << ", num edges: " << graphStruct->edgeSize
+	cout << "** Graph (num node: " << n << ", num edges: " << graphStruct->edgeCount
 			<< ")" << endl;
 	cout << "         (min deg: " << minDeg << ", max deg: " << maxDeg
 		 << ", mean deg: " << meanDeg << ", connected: " << connected << ")"

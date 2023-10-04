@@ -2,6 +2,7 @@
 #pragma once
 
 #include <curand_kernel.h>
+#include <bitset>
 #include "utils/graph/graph.h"
 #include "utils/common.h"
 
@@ -13,6 +14,7 @@ struct Coloring {
 	bool		uncoloredNodes;
 	uint		numOfColors;
 	uint* coloring;   // each element denotes the color of the node at the correspondent index
+	bool* colorBitmaps;
 };
 
 struct ColoringUtils {
@@ -20,7 +22,20 @@ struct ColoringUtils {
 	int* availableColors{ nullptr };
 };
 
-Coloring* LubyGreedy(GraphStruct*);
+class Colorer
+{
+private:
+
+	Coloring m_Coloring;
+	const GraphStruct* m_GraphStruct;
+
+public:
+	Colorer(const GraphStruct*);
+	Coloring* LDFColoring();
+	~Colorer();
+};
+
+Coloring* RandomPriorityColoring(GraphStruct*);
 void printColoring(Coloring*, GraphStruct*, bool);
 __global__ void init(uint seed, curandState_t*, uint*, uint);
 void LubyJPcolorer(Coloring*, GraphStruct*, uint*);

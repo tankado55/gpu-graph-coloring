@@ -17,10 +17,10 @@
   <ItemGroup>
     <CudaCompile Include="src\main.cu" />
     <CudaCompile Include="src\utils\graph\graph_d.cu" />
-    <CudaCompile Include="src\coloring.cu" />
+    <CudaCompile Include="src\Colorer.cu" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\coloring.h">
+    <ClInclude Include="src\Colorer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\utils\common.h">
