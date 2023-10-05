@@ -17,7 +17,7 @@ void Graph::setup(node_sz n) {
 		memsetGPU(n, string("nodes"));
 	else {
 		graphStruct = new GraphStruct();
-		graphStruct->cumDegs = new node[n + 1]{};  // starts by zero
+		graphStruct->neighIndex = new node[n + 1]{};  // starts by zero
 	}
 	graphStruct->nodeCount = n;
 }
@@ -40,13 +40,13 @@ void Graph::randGraph(float prob, std::default_random_engine & eng) {
 			if (randR(eng) < prob) {
 				edges[i].push_back(j);
 				edges[j].push_back(i);
-				graphStruct->cumDegs[i + 1]++;
-				graphStruct->cumDegs[j + 1]++;
+				graphStruct->neighIndex[i + 1]++;
+				graphStruct->neighIndex[j + 1]++;
 				graphStruct->edgeCount += 2;
 			}
 	}
 	for (int i = 0; i < n; i++)
-		graphStruct->cumDegs[i + 1] += graphStruct->cumDegs[i];
+		graphStruct->neighIndex[i + 1] += graphStruct->neighIndex[i];
 
 	// max, min, mean deg
 	maxDeg = 0;
@@ -74,7 +74,29 @@ void Graph::randGraph(float prob, std::default_random_engine & eng) {
 		graphStruct->neighs = new node[graphStruct->edgeCount] { };
 
 	for (int i = 0; i < n; i++)
-		memcpy((graphStruct->neighs + graphStruct->cumDegs[i]), edges[i].data(), sizeof(int) * edges[i].size());
+		memcpy((graphStruct->neighs + graphStruct->neighIndex[i]), edges[i].data(), sizeof(int) * edges[i].size());
+}
+
+void Graph::getLDFDag(GraphStruct* res)
+{
+	res->nodeCount = graphStruct->nodeCount;
+	res->edgeCount = (graphStruct->edgeCount + 1) / 2;
+	int k = 0;
+	for (int i = 0; i < graphStruct->nodeCount; ++i)
+	{
+		int degree = graphStruct->deg(i);
+		for (int j = 0; j < degree; ++j)
+		{
+			unsigned int neighID = graphStruct->neighs[graphStruct->neighIndex[i] + j];
+			unsigned int neighDegree = graphStruct->deg(neighID);
+			if (degree > neighDegree || (degree == neighDegree && i > neighID))
+			{
+				res->neighs[k] = neighID;
+				++k;
+			}
+		}
+		res->neighIndex[i + 1] = k;
+	}
 }
 
 /**
@@ -92,9 +114,9 @@ void Graph::print(bool verbose) {
 	if (verbose) {
 		for (int i = 0; i < n; i++) {
 			cout << "   node(" << i << ")" << "["
-					<< graphStruct->cumDegs[i + 1] - graphStruct->cumDegs[i] << "]-> ";
-			for (int j = 0; j < graphStruct->cumDegs[i + 1] - graphStruct->cumDegs[i]; j++) {
-				cout << graphStruct->neighs[graphStruct->cumDegs[i] + j] << " ";
+					<< graphStruct->neighIndex[i + 1] - graphStruct->neighIndex[i] << "]-> ";
+			for (int j = 0; j < graphStruct->neighIndex[i + 1] - graphStruct->neighIndex[i]; j++) {
+				cout << graphStruct->neighs[graphStruct->neighIndex[i] + j] << " ";
 			}
 			cout << "\n";
 		}

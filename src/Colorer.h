@@ -6,10 +6,6 @@
 #include "utils/graph/graph.h"
 #include "utils/common.h"
 
-/**
- *  graph coloring struct (colors are: 1,2,3,..,k)
- */
-
 struct Coloring {
 	bool uncoloredFlag;
 	uint numOfColors;
@@ -25,12 +21,13 @@ struct ColoringUtils {
 class Colorer
 {
 private:
-
 	Coloring* m_Coloring;
 	GraphStruct* m_GraphStruct;
+	Graph* m_Graph;
+	int* m_InboundCounts;
 
 public:
-	Colorer(GraphStruct*);
+	Colorer(Graph*);
 	Coloring* LDFColoring();
 	~Colorer();
 };

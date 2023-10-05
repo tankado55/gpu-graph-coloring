@@ -11,50 +11,77 @@ using namespace std;
 
 #define THREADxBLOCK 128
 
-Colorer::Colorer(GraphStruct* graphStruct)
+Colorer::Colorer(Graph* graph)
 {
-	m_GraphStruct = graphStruct;
+	m_Graph = graph;
+	m_GraphStruct = graph->getStruct();
 	CHECK(cudaMallocManaged(&m_Coloring, sizeof(Coloring)));
 	m_Coloring->uncoloredFlag = true;
 	m_Coloring->numOfColors = 0;
 
-	uint n = graphStruct->nodeCount;
+	uint n = m_GraphStruct->nodeCount;
 
 	CHECK(cudaMallocManaged(&m_Coloring->coloring, n * sizeof(uint)));
 	memset(m_Coloring->coloring, 0, n * sizeof(uint));
 	CHECK(cudaMallocManaged(&m_Coloring->coloredNodes, n * sizeof(bool)));
 	memset(m_Coloring->coloredNodes, 0, n * sizeof(bool));
+
+	//init inbound counts
+	CHECK(cudaMallocManaged(&m_InboundCounts, n * sizeof(uint)));
+
+
 }
 
-Colorer::~Colorer(){}
+Colorer::~Colorer(){
+	cudaFree(m_InboundCounts);
+}
 
-__global__ void initLDF(GraphStruct* graphStruct, uint n) {
+__global__ void initLDF(GraphStruct* graphStruct, int* inboundCounts, int n) {
 	uint idx = blockIdx.x * blockDim.x + threadIdx.x;
 	if (idx >= n)
 		return;
 
-	uint degree = graphStruct->cumDegs[idx + 1] - graphStruct->cumDegs[idx];
+	uint degree = graphStruct->neighIndex[idx + 1] - graphStruct->neighIndex[idx];
 	printf("node(%d [myDegree: %d] \n", idx, degree);
 
-	graphStruct->inCounts[idx] = 0;
+	inboundCounts[idx] = 0;
 	for (uint i = 0; i < degree; ++i)
 	{
-		uint neighID = graphStruct->neighs[graphStruct->cumDegs[idx] + i];
-		uint neighDegree = graphStruct->cumDegs[neighID + 1] - graphStruct->cumDegs[neighID]; // ottimizzabile su CPU
+		uint neighID = graphStruct->neighs[graphStruct->neighIndex[idx] + i];
+		uint neighDegree = graphStruct->neighIndex[neighID + 1] - graphStruct->neighIndex[neighID]; // ottimizzabile su CPU
 		if (degree > neighDegree)
 		{
-			atomicAdd(&graphStruct->inCounts[neighID], 1);
-			printf(" atomicAdd node(%d -> %d [count: %d] \n", idx, neighID, graphStruct->inCounts[neighID]);
+			atomicAdd(&inboundCounts[neighID], 1);
+			printf(" atomicAdd node(%d -> %d [count: %d] \n", idx, neighID, inboundCounts[neighID]);
 		}
 		else if (degree == neighDegree && idx > neighID)
 		{
-			atomicAdd(&graphStruct->inCounts[neighID], 1);
-			printf(" atomicAdd node(%d -> %d [count: %d] \n", idx, neighID, graphStruct->inCounts[neighID]);
+			atomicAdd(&inboundCounts[neighID], 1);
+			printf(" atomicAdd node(%d -> %d [count: %d] \n", idx, neighID, inboundCounts[neighID]);
 		}
 	}
 }
 
-__global__ void findISLDF(Coloring* coloring, GraphStruct* graphStruct, bool* bitmaps, int* bitmapIndex)
+__global__ void initLDF2(GraphStruct* graphStruct, int* inboundCounts, int n) {
+	uint idx = blockIdx.x * blockDim.x + threadIdx.x;
+	if (idx >= n)
+		return;
+
+	uint degree = graphStruct->neighIndex[idx + 1] - graphStruct->neighIndex[idx];
+	//printf("node(%d [myDegree: %d] \n", idx, degree);
+
+	inboundCounts[idx] = 0;
+	for (uint i = 0; i < degree; ++i)
+	{
+		uint neighID = graphStruct->neighs[graphStruct->neighIndex[idx] + i];
+		
+		atomicAdd(&inboundCounts[neighID], 1);
+		//printf(" atomicAdd node(%d -> %d [count: %d] \n", idx, neighID, inboundCounts[neighID]);
+		
+	}
+}
+
+__global__ void findISLDF(Coloring* coloring, GraphStruct* graphStruct, bool* bitmaps, int* bitmapIndex, int* inboundCounts)
 {
 	uint idx = threadIdx.x + blockDim.x * blockIdx.x;
 
@@ -64,12 +91,12 @@ __global__ void findISLDF(Coloring* coloring, GraphStruct* graphStruct, bool* bi
 	if (coloring->coloredNodes[idx])
 		return;
 
-	printf("GPU - I'm %d, myInbound: %d\n", idx, graphStruct->inCounts[idx]);
+	//printf("GPU - I'm %d, myInbound: %d\n", idx, inboundCounts[idx]);
 
-	uint offset = graphStruct->cumDegs[idx];
-	uint deg = graphStruct->cumDegs[idx + 1] - graphStruct->cumDegs[idx];
+	uint offset = graphStruct->neighIndex[idx];
+	uint deg = graphStruct->neighIndex[idx + 1] - graphStruct->neighIndex[idx];
 
-	if (graphStruct->inCounts[idx] == 0) // Ready node
+	if (inboundCounts[idx] == 0) // Ready node
 	{
 		int colorCount = bitmapIndex[idx + 1] - bitmapIndex[idx];
 		printf("I'm %d, total colors: %d\n", idx, colorCount);
@@ -95,7 +122,7 @@ __global__ void findISLDF(Coloring* coloring, GraphStruct* graphStruct, bool* bi
 			uint neighID = graphStruct->neighs[offset + i];
 			if (!coloring->coloredNodes[neighID])
 			{
-				atomicAdd(&graphStruct->inCounts[neighID], -1);
+				atomicAdd(&inboundCounts[neighID], -1);
 				bitmaps[bitmapIndex[neighID] + bestColor] = 0;
 			}
 		}
@@ -111,8 +138,16 @@ Coloring* Colorer::LDFColoring()
 	dim3 blockDim(THREADxBLOCK);
 	dim3 gridDim((m_GraphStruct->nodeCount + blockDim.x - 1) / blockDim.x, 1, 1);
 	
-	// Init DAG calculating inCounts
-	initLDF <<<gridDim, blockDim>>> (m_GraphStruct, m_GraphStruct->nodeCount);
+	// Init DAG TODO: refactorare
+	GraphStruct* dag;
+	CHECK(cudaMallocManaged(&dag, sizeof(GraphStruct)));
+	CHECK(cudaMallocManaged(&(dag->neighIndex), (m_GraphStruct->nodeCount + 1) * sizeof(int)));
+	CHECK(cudaMallocManaged(&(dag->neighs), (m_GraphStruct->edgeCount+1)/2 * sizeof(int)));
+	m_Graph->getLDFDag(dag);
+
+	// Init DAG calculating inCounts TODO: ridondanza di codice dentro initLDF
+	//initLDF <<<gridDim, blockDim>>> (m_GraphStruct, m_InboundCounts, m_GraphStruct->nodeCount);
+	initLDF2 <<<gridDim, blockDim>>> (dag, m_InboundCounts, m_GraphStruct->nodeCount);
 	cudaDeviceSynchronize();
 
 	// inizialize bitmaps
@@ -127,14 +162,29 @@ Coloring* Colorer::LDFColoring()
 
 	bitmapIndex[0] = 0;
 	for (int i = 1; i < m_GraphStruct->nodeCount + 1; i++)
-		bitmapIndex[i] = bitmapIndex[i - 1] + m_GraphStruct->inCounts[i - 1] + 1;
+		bitmapIndex[i] = bitmapIndex[i - 1] + m_InboundCounts[i - 1] + 1; //this info should be taken by the dag and the inbound should be only in gpu mem
 
 	uint iterationCount = 0;
 	while (m_Coloring->uncoloredFlag) {
 		m_Coloring->uncoloredFlag = false;
 		iterationCount++;
 		printf("------------ Sequential iteration: %d \n", iterationCount);
-		findISLDF <<< gridDim, blockDim >>> (m_Coloring, m_GraphStruct, bitmaps, bitmapIndex);
+		int deb_inBoundSum = 0;
+		for (int i = 0; i < m_GraphStruct->nodeCount; ++i)
+		{
+			deb_inBoundSum += m_InboundCounts[i];
+		}
+		printf("------------ inboundsum: %d \n", deb_inBoundSum);
+		printf("edges: %d", m_GraphStruct->edgeCount);
+		int deb_ready = 0;
+		for (int i = 0; i < m_GraphStruct->nodeCount; ++i)
+		{
+			if (m_InboundCounts[i] == 0 && m_Coloring->coloredNodes[i] == false)
+				++deb_ready;
+		}
+		if (deb_ready == 0)
+			printf("------------ ready: %d \n", deb_ready);
+		findISLDF <<< gridDim, blockDim >>> (m_Coloring, dag, bitmaps, bitmapIndex, m_InboundCounts);
 		cudaDeviceSynchronize();
 	}
 
@@ -183,8 +233,8 @@ __global__ void findIS(Coloring* col, GraphStruct* graphStruct, uint* weights) {
 	if (col->coloring[idx])
 		return;
 
-	uint offset = graphStruct->cumDegs[idx];
-	uint deg = graphStruct->cumDegs[idx + 1] - graphStruct->cumDegs[idx];
+	uint offset = graphStruct->neighIndex[idx];
+	uint deg = graphStruct->neighIndex[idx + 1] - graphStruct->neighIndex[idx];
 
 	bool candidate = true;
 	for (uint j = 0; j < deg; j++) {

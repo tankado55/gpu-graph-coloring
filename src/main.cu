@@ -4,7 +4,7 @@
 #include <iostream>
 
 int main(void) {
-	unsigned int n = 8;		 // number of nodes for random graphs
+	unsigned int n = 10000;		 // number of nodes for random graphs
 	float prob = .5;				    // density (percentage) for random graphs
 	std::default_random_engine engine{ 0 };  // fixed seed
 
@@ -17,6 +17,8 @@ int main(void) {
 	// get the graph struct
 	GraphStruct* graphStruct = graph.getStruct();
 
+	printf("start, edgeCount: %d\n", graphStruct->edgeCount);
+
 	// print small graph
 	if (n <= 128) {
 		//graph.print(true);  // CPU print
@@ -26,7 +28,7 @@ int main(void) {
 
 	// GPU Luby-JP greedy coloring
 	//Coloring* coloring = RandomPriorityColoring(graphStruct);
-	Colorer colorer(graphStruct);
+	Colorer colorer(&graph);
 	Coloring* coloring2 = colorer.LDFColoring();
 	//printColoring(coloring, graphStruct, 1);
 	printColoring(coloring2, graphStruct, 1);
