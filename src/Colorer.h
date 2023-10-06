@@ -24,7 +24,7 @@ private:
 	Coloring* m_Coloring;
 	GraphStruct* m_GraphStruct;
 	Graph* m_Graph;
-	int* m_InboundCounts;
+	uint* m_InboundCounts;
 
 public:
 	Colorer(Graph*);

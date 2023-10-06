@@ -62,7 +62,7 @@ __global__ void initLDF(GraphStruct* graphStruct, int* inboundCounts, int n) {
 	}
 }
 
-__global__ void initLDF2(GraphStruct* graphStruct, int* inboundCounts, int n) {
+__global__ void initLDF2(GraphStruct* graphStruct, uint* inboundCounts, int n) {
 	uint idx = blockIdx.x * blockDim.x + threadIdx.x;
 	if (idx >= n)
 		return;
@@ -81,7 +81,7 @@ __global__ void initLDF2(GraphStruct* graphStruct, int* inboundCounts, int n) {
 	}
 }
 
-__global__ void findISLDF(Coloring* coloring, GraphStruct* graphStruct, bool* bitmaps, int* bitmapIndex, int* inboundCounts)
+__global__ void findISLDF(Coloring* coloring, GraphStruct* graphStruct, bool* bitmaps, uint* bitmapIndex, uint* inboundCounts)
 {
 	uint idx = threadIdx.x + blockDim.x * blockIdx.x;
 
@@ -145,7 +145,6 @@ Coloring* Colorer::LDFColoring()
 	CHECK(cudaMallocManaged(&(dag->neighs), (m_GraphStruct->edgeCount+1)/2 * sizeof(int)));
 	m_Graph->getLDFDag(dag);
 
-	// Init DAG calculating inCounts TODO: ridondanza di codice dentro initLDF
 	//initLDF <<<gridDim, blockDim>>> (m_GraphStruct, m_InboundCounts, m_GraphStruct->nodeCount);
 	initLDF2 <<<gridDim, blockDim>>> (dag, m_InboundCounts, m_GraphStruct->nodeCount);
 	cudaDeviceSynchronize();
@@ -157,9 +156,9 @@ Coloring* Colorer::LDFColoring()
 	CHECK(cudaMallocManaged(&(bitmaps), bitCount * sizeof(bool)));
 	memset(bitmaps, 1, bitCount * sizeof(bool));
 
-	int* bitmapIndex;
-	CHECK(cudaMallocManaged(&(bitmapIndex), m_GraphStruct->nodeCount + 1 * sizeof(int)));
-
+	uint* bitmapIndex;
+	CHECK(cudaMallocManaged(&bitmapIndex, (m_GraphStruct->nodeCount + 1) * sizeof(uint)));
+	cudaDeviceSynchronize();
 	bitmapIndex[0] = 0;
 	for (int i = 1; i < m_GraphStruct->nodeCount + 1; i++)
 		bitmapIndex[i] = bitmapIndex[i - 1] + m_InboundCounts[i - 1] + 1; //this info should be taken by the dag and the inbound should be only in gpu mem

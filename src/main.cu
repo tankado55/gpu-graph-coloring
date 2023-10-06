@@ -4,8 +4,8 @@
 #include <iostream>
 
 int main(void) {
-	unsigned int n = 10000;		 // number of nodes for random graphs
-	float prob = .5;				    // density (percentage) for random graphs
+	unsigned int n = 65536;		 // number of nodes for random graphs
+	float prob = .02;				    // density (percentage) for random graphs
 	std::default_random_engine engine{ 0 };  // fixed seed
 
 	// new graph with n nodes
@@ -18,6 +18,7 @@ int main(void) {
 	GraphStruct* graphStruct = graph.getStruct();
 
 	printf("start, edgeCount: %d\n", graphStruct->edgeCount);
+	printf("start, nodeCount: %d\n", graphStruct->nodeCount);
 
 	// print small graph
 	if (n <= 128) {
