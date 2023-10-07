@@ -1,7 +1,7 @@
 ﻿
 #include "device_launch_parameters.h"
 #include <iostream>
-#include "utils/graph/graph_d.h"
+#include "graph/graph_d.h"
 #include "utils/common.h"
 #include <cooperative_groups.h>
 
@@ -290,7 +290,7 @@ void LubyJPcolorer(Coloring* col, GraphStruct* graphStruct, uint* weights) {
  * @param verbose print the complete graph
  */
 void printColoring(Coloring* col, GraphStruct* graphStruct, bool verbose) {
-	node n = graphStruct->nodeCount;
+	unsigned n = graphStruct->nodeCount;
 	cout << "** Graph (num node: " << n << ", num edges: " << graphStruct->edgeCount << ")" << endl;
 	cout << "** Coloring (num colors: " << col->numOfColors + 1 << ")" << endl;
 	if (verbose) {

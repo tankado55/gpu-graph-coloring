@@ -12,12 +12,12 @@ using namespace std;
  * @param density probability of an edge (expected density)
  * @param eng seed
  */
-void Graph::setup(node_sz n) {
+void Graph::Init(unsigned n) {
 	if (GPUEnabled)
 		memsetGPU(n, string("nodes"));
 	else {
 		graphStruct = new GraphStruct();
-		graphStruct->neighIndex = new node[n + 1]{};  // starts by zero
+		graphStruct->neighIndex = new unsigned[n + 1]{};  // starts by zero
 	}
 	graphStruct->nodeCount = n;
 }
@@ -31,7 +31,7 @@ void Graph::randGraph(float prob, std::default_random_engine & eng) {
 		printf("[Graph] Warning: Probability not valid (set p = 0.5)!!\n");
 	}
 	uniform_real_distribution<> randR(0.0, 1.0);
-	node n = graphStruct->nodeCount;
+	unsigned n = graphStruct->nodeCount;
 
 	// gen edges
 	vector<int>* edges = new vector<int>[n];
@@ -71,7 +71,7 @@ void Graph::randGraph(float prob, std::default_random_engine & eng) {
 	if (GPUEnabled)
 		memsetGPU(n,"edges");
 	else
-		graphStruct->neighs = new node[graphStruct->edgeCount] { };
+		graphStruct->neighs = new unsigned[graphStruct->edgeCount] { };
 
 	for (int i = 0; i < n; i++)
 		memcpy((graphStruct->neighs + graphStruct->neighIndex[i]), edges[i].data(), sizeof(int) * edges[i].size());
@@ -104,7 +104,7 @@ void Graph::getLDFDag(GraphStruct* res)
  * @param verbose print the complete graph
  */
 void Graph::print(bool verbose) {
-	node n = graphStruct->nodeCount;
+	unsigned n = graphStruct->nodeCount;
 	cout << "** Graph (num node: " << n << ", num edges: " << graphStruct->edgeCount
 			<< ")" << endl;
 	cout << "         (min deg: " << minDeg << ", max deg: " << maxDeg
@@ -123,4 +123,3 @@ void Graph::print(bool verbose) {
 		cout << "\n";
 	}
 }
-

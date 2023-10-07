@@ -3,7 +3,7 @@
 
 #include <curand_kernel.h>
 #include <bitset>
-#include "utils/graph/graph.h"
+#include "graph/graph.h"
 #include "utils/common.h"
 
 struct Coloring {

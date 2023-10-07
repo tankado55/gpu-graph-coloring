@@ -4,7 +4,7 @@
 #include <iostream>
 
 int main(void) {
-	unsigned int n = 65536;		 // number of nodes for random graphs
+	unsigned int n = 1000;		 // number of nodes for random graphs
 	float prob = .02;				    // density (percentage) for random graphs
 	std::default_random_engine engine{ 0 };  // fixed seed
 
@@ -36,3 +36,6 @@ int main(void) {
 
 	return EXIT_SUCCESS;
 }
+
+// il costruttore lo cambio, perché non é safe avere un oggetto con n nodi senza n memory allocata, copia questo commento nel costruttore
+// il bool memory lo metto nel randgrapg

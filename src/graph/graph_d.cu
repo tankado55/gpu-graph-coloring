@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <iostream>
 #include "graph.h"
-#include "../common.h"
+#include "../utils/common.h"
 
 using namespace std;
 
@@ -9,14 +9,14 @@ using namespace std;
  * Set the CUDA Unified Memory for nodes and edges
  * @param memType node or edge memory type
  */
-void Graph::memsetGPU(node_sz n, string memType) {
+void Graph::memsetGPU(unsigned n, string memType) {
 	if (!memType.compare("nodes")) {
 		CHECK(cudaMallocManaged(&graphStruct, sizeof(GraphStruct)));
-		CHECK(cudaMallocManaged(&(graphStruct->neighIndex), (n+1)*sizeof(node)));
+		CHECK(cudaMallocManaged(&(graphStruct->neighIndex), (n+1)*sizeof(unsigned)));
 		//CHECK(cudaMallocManaged(&(void**)(graphStruct->maxDeg), sizeof(uint)));
 	}
 	else if (!memType.compare("edges")) {
-		CHECK(cudaMallocManaged(&(graphStruct->neighs), graphStruct->edgeCount*sizeof(node)));
+		CHECK(cudaMallocManaged(&(graphStruct->neighs), graphStruct->edgeCount*sizeof(unsigned)));
 	}
 }
 
@@ -40,5 +40,3 @@ __global__ void print_d(GraphStruct* graphStruct, bool verbose) {
 		printf("\n");
 	}
 }
-
-

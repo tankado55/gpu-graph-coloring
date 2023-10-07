@@ -16,7 +16,7 @@
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="src\main.cu" />
-    <CudaCompile Include="src\utils\graph\graph_d.cu" />
+    <CudaCompile Include="src\graph\graph_d.cu" />
     <CudaCompile Include="src\Colorer.cu" />
   </ItemGroup>
   <ItemGroup>
@@ -26,15 +26,15 @@
     <ClInclude Include="src\utils\common.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\utils\graph\graph.h">
+    <ClInclude Include="src\graph\graph.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\utils\graph\graph_d.h">
+    <ClInclude Include="src\graph\graph_d.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\utils\graph\graph.cpp">
+    <ClCompile Include="src\graph\graph.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
