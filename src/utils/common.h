@@ -2,6 +2,8 @@
 #include <ctime>
 #include <stdio.h>
 
+#include "driver_types.h"
+
 #ifndef _COMMON_H
 #define _COMMON_H
 

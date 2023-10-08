@@ -9,16 +9,7 @@ using namespace std;
  * Set the CUDA Unified Memory for nodes and edges
  * @param memType node or edge memory type
  */
-void Graph::memsetGPU(unsigned n, string memType) {
-	if (!memType.compare("nodes")) {
-		CHECK(cudaMallocManaged(&graphStruct, sizeof(GraphStruct)));
-		CHECK(cudaMallocManaged(&(graphStruct->neighIndex), (n+1)*sizeof(unsigned)));
-		//CHECK(cudaMallocManaged(&(void**)(graphStruct->maxDeg), sizeof(uint)));
-	}
-	else if (!memType.compare("edges")) {
-		CHECK(cudaMallocManaged(&(graphStruct->neighs), graphStruct->edgeCount*sizeof(unsigned)));
-	}
-}
+
 
 
 

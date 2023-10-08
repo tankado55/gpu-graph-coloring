@@ -2,7 +2,9 @@
 #include <cstring>
 #include <iostream>
 #include <memory>
+
 #include "graph.h"
+#include "../utils/common.h"
 
 using namespace std;
 
@@ -12,41 +14,69 @@ using namespace std;
  * @param density probability of an edge (expected density)
  * @param eng seed
  */
-void Graph::Init(unsigned n) {
-	if (GPUEnabled)
-		memsetGPU(n, string("nodes"));
-	else {
-		graphStruct = new GraphStruct();
-		graphStruct->neighIndex = new unsigned[n + 1]{};  // starts by zero
-	}
-	graphStruct->nodeCount = n;
+
+Graph::Graph(MemoryEnum mem) {
+	memoryEnum = mem;
+	Init();
 }
 
-/**
- * Generate a new random graph
- * @param eng seed
- */
-void Graph::randGraph(float prob, std::default_random_engine & eng) {
+void Graph::Init() {
+	if (memoryEnum == ManagedAllocated)
+	{
+		CHECK(cudaMallocManaged(&graphStruct, sizeof(GraphStruct)));
+	}
+	else
+	{
+		graphStruct = new GraphStruct();
+	}
+	graphStruct->nodeCount = graphStruct->edgeCount = graphStruct->maxDeg = 0;
+	graphStruct->neighIndex = graphStruct->neighs = NULL;
+}
+
+void Graph::randGraph(float prob, std::default_random_engine & eng, unsigned n) {
+	/*
+		if (useManagedMemory)
+		memsetGPU(n, string("nodes"));
+	else {
+		
+		graphStruct->neighIndex = new unsigned[n + 1] {};  // starts by zero
+	}
+	*/
+	
+	graphStruct->nodeCount = n;
+
 	if (prob < 0 || prob > 1) {
 		printf("[Graph] Warning: Probability not valid (set p = 0.5)!!\n");
 	}
 	uniform_real_distribution<> randR(0.0, 1.0);
-	unsigned n = graphStruct->nodeCount;
 
 	// gen edges
 	vector<int>* edges = new vector<int>[n];
+	vector<unsigned> index(n+1);
 	for (int i = 0; i < n - 1; i++) {
 		for (int j = i + 1; j < n; j++)
 			if (randR(eng) < prob) {
 				edges[i].push_back(j);
 				edges[j].push_back(i);
-				graphStruct->neighIndex[i + 1]++;
-				graphStruct->neighIndex[j + 1]++;
+				index[i + 1]++;
+				index[j + 1]++;
 				graphStruct->edgeCount += 2;
 			}
 	}
 	for (int i = 0; i < n; i++)
-		graphStruct->neighIndex[i + 1] += graphStruct->neighIndex[i];
+		index[i + 1] += index[i];
+
+	// manage memory for edges with CUDA Unified Memory
+	if (memoryEnum == ManagedAllocated)
+		AllocManaged();
+	else
+		AllocHost();
+	
+	for (int i = 0; i < n; i++)
+	{
+		memcpy((graphStruct->neighs + graphStruct->neighIndex[i]), edges[i].data(), sizeof(int) * edges[i].size());
+		memcpy(graphStruct->neighIndex, index.data(), sizeof(unsigned) * index.size());
+	}
 
 	// max, min, mean deg
 	maxDeg = 0;
@@ -56,25 +86,36 @@ void Graph::randGraph(float prob, std::default_random_engine & eng) {
 		{
 			maxDeg = graphStruct->deg(i);
 			graphStruct->maxDeg = maxDeg;
-		}			
+		}
 		if (graphStruct->deg(i) < minDeg)
 			minDeg = graphStruct->deg(i);
 	}
-	density = (float) graphStruct->edgeCount / (float) (n * (n - 1));
-	meanDeg = (float) graphStruct->edgeCount / (float) n;
+	density = (float)graphStruct->edgeCount / (float)(n * (n - 1));
+	meanDeg = (float)graphStruct->edgeCount / (float)n;
 	if (minDeg == 0)
 		connected = false;
 	else
 		connected = true;
+}
 
-	// manage memory for edges with CUDA Unified Memory
-	if (GPUEnabled)
-		memsetGPU(n,"edges");
+void Graph::BuildRandomDAG(Graph& dag)
+{
+	// Init
+	dag.graphStruct->nodeCount = graphStruct->nodeCount;
+	dag.graphStruct->edgeCount = (graphStruct->edgeCount + 1) / 2;
+	if (dag.memoryEnum == ManagedAllocated)
+		dag.AllocManaged();
 	else
-		graphStruct->neighs = new unsigned[graphStruct->edgeCount] { };
+		dag.AllocHost();
+	
+	// Create an array or random priorities
+	unsigned int* priorities = new unsigned int[graphStruct->nodeCount];
 
-	for (int i = 0; i < n; i++)
-		memcpy((graphStruct->neighs + graphStruct->neighIndex[i]), edges[i].data(), sizeof(int) * edges[i].size());
+
+
+
+
+	delete[] priorities;
 }
 
 void Graph::getLDFDag(GraphStruct* res)
@@ -99,6 +140,24 @@ void Graph::getLDFDag(GraphStruct* res)
 	}
 }
 
+void Graph::AllocManaged()
+{
+	CHECK(cudaMallocManaged(&(graphStruct->neighIndex), (graphStruct->nodeCount + 1) * sizeof(unsigned)));
+	CHECK(cudaMallocManaged(&(graphStruct->neighs), graphStruct->edgeCount * sizeof(unsigned)));
+}
+
+void Graph::FreeManaged()
+{
+	CHECK(cudaFree(graphStruct->neighIndex));
+	CHECK(cudaFree(graphStruct->neighs));
+}
+
+void Graph::AllocHost()
+{
+	graphStruct->neighs = new unsigned[graphStruct->edgeCount] {};
+	graphStruct->neighIndex = new unsigned[graphStruct->nodeCount + 1] {};  // starts by zero
+}
+
 /**
  * Print the graph (verbose = 1 for "verbose print")
  * @param verbose print the complete graph
@@ -121,5 +180,17 @@ void Graph::print(bool verbose) {
 			cout << "\n";
 		}
 		cout << "\n";
+	}
+}
+
+Graph::~Graph()
+{
+	if (memoryEnum == ManagedAllocated)
+	{
+		FreeManaged();
+	}
+	else
+	{
+		delete graphStruct;
 	}
 }

@@ -13,6 +13,7 @@ struct Coloring {
 	bool* coloredNodes;
 };
 
+// probabilmente lo cancello, non ha molto senso tenersi lo stato dei colori
 struct ColoringUtils {
 	int* availableColorIndex{ nullptr };
 	int* availableColors{ nullptr };
@@ -29,6 +30,7 @@ private:
 public:
 	Colorer(Graph*);
 	Coloring* LDFColoring();
+	Coloring* SeqCPURandomPriorityColoring();
 	~Colorer();
 };
 

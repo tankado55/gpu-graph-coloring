@@ -13,7 +13,6 @@ struct GraphStruct {
 	unsigned* neighs{nullptr};           // list of neighbors for all nodes (edges)
 	unsigned int maxDeg;
 		
-
 	~GraphStruct() {delete[] neighs; delete[] neighIndex;}
 
 	// check whether node j is a neighbor of node i
@@ -28,29 +27,31 @@ struct GraphStruct {
 	unsigned int deg(unsigned i) {
 		return(neighIndex[i+1]-neighIndex[i]);
 	}
-
-	
 };
 
-/**
- * It manages a graph for CPU & GPU
- */
 class Graph {
+	
+private:
 	float density{0.0f};	        // Probability of an edge (Erdos graph)
 	GraphStruct * graphStruct{nullptr};     // graph structure
 	unsigned maxDeg{0};
 	unsigned minDeg{0};
 	float meanDeg{0.0f};
 	bool connected{true};
-	bool GPUEnabled{true};
+	void AllocManaged();                 // use UVA memory on CPU/GPU
+	void FreeManaged();
+	void AllocHost();
 
 public:
-	Graph(unsigned n, bool GPUEnb) : GPUEnabled{GPUEnb} {Init(n);}
-	void Init(unsigned);	                             // CPU/GPU mem setup
-	void randGraph(float, std::default_random_engine&);  // generate an Erdos random graph
+	enum MemoryEnum { ManagedAllocated, HostAllocated } memoryEnum;
+
+	Graph(MemoryEnum);
+	~Graph();
+	void Init(); // CPU/GPU mem setup
+	void randGraph(float, std::default_random_engine&, unsigned);  // generate an Erdos random graph
+	void BuildRandomDAG(Graph&);
 	void print(bool);
 	void print_d(GraphStruct *, bool);
 	GraphStruct* getStruct() {return graphStruct;}
-	void memsetGPU(unsigned, std::string);                 // use UVA memory on CPU/GPU
 	void getLDFDag(GraphStruct*);
 };

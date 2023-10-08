@@ -7,8 +7,6 @@
 
 #include "colorer.h"
 
-using namespace std;
-
 #define THREADxBLOCK 128
 
 Colorer::Colorer(Graph* graph)
@@ -28,8 +26,6 @@ Colorer::Colorer(Graph* graph)
 
 	//init inbound counts
 	CHECK(cudaMallocManaged(&m_InboundCounts, n * sizeof(uint)));
-
-
 }
 
 Colorer::~Colorer(){
@@ -190,6 +186,13 @@ Coloring* Colorer::LDFColoring()
 	return m_Coloring;
 }
 
+Coloring* Colorer::SeqCPURandomPriorityColoring()
+{
+	// DAG
+	Graph dag(Graph::MemoryEnum::HostAllocated);
+	m_Graph->BuildRandomDAG(dag);
+}
+
 Coloring* RandomPriorityColoring(GraphStruct* graphStruct) {
 	// set coloring struct
 
@@ -291,17 +294,17 @@ void LubyJPcolorer(Coloring* col, GraphStruct* graphStruct, uint* weights) {
  */
 void printColoring(Coloring* col, GraphStruct* graphStruct, bool verbose) {
 	unsigned n = graphStruct->nodeCount;
-	cout << "** Graph (num node: " << n << ", num edges: " << graphStruct->edgeCount << ")" << endl;
-	cout << "** Coloring (num colors: " << col->numOfColors + 1 << ")" << endl;
+	std::cout << "** Graph (num node: " << n << ", num edges: " << graphStruct->edgeCount << ")" << std::endl;
+	std::cout << "** Coloring (num colors: " << col->numOfColors + 1 << ")" << std::endl;
 	if (verbose) {
 		for (uint i = 0; i <= col->numOfColors; i++) {
-			cout << "   color(" << i << ")" << "-> ";
+			std::cout << "   color(" << i << ")" << "-> ";
 			for (uint j = 0; j < n; j++)
 				if (col->coloring[j] == i)
-					cout << j << " ";
-			cout << "\n";
+					std::cout << j << " ";
+			std::cout << "\n";
 		}
-		cout << "\n";
+		std::cout << "\n";
 	}
 }
 

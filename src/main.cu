@@ -1,6 +1,7 @@
 
 #include "Colorer.h"
 #include "utils/common.h"
+#include "graph/graph.h"
 #include <iostream>
 
 int main(void) {
@@ -9,10 +10,10 @@ int main(void) {
 	std::default_random_engine engine{ 0 };  // fixed seed
 
 	// new graph with n nodes
-	Graph graph(n, 1);
+	Graph graph(Graph::MemoryEnum::ManagedAllocated);
 
 	// generate a random graph
-	graph.randGraph(prob, engine);
+	graph.randGraph(prob, engine, n);
 
 	// get the graph struct
 	GraphStruct* graphStruct = graph.getStruct();
@@ -37,5 +38,5 @@ int main(void) {
 	return EXIT_SUCCESS;
 }
 
-// il costruttore lo cambio, perché non é safe avere un oggetto con n nodi senza n memory allocata, copia questo commento nel costruttore
+
 // il bool memory lo metto nel randgrapg

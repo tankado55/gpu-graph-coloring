@@ -146,7 +146,9 @@
     <ClInclude Include="src\graph\graph_d.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\graph\graph.cpp" />
+    <CudaCompile Include="src\graph\graph.cu">
+      <FileType>Document</FileType>
+    </CudaCompile>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
