@@ -67,7 +67,7 @@ __global__ void initLDF2(GraphStruct* graphStruct, uint* inboundCounts, int n) {
 	//printf("node(%d [myDegree: %d] \n", idx, degree);
 
 	inboundCounts[idx] = 0;
-	for (uint i = 0; i < degree; ++i)
+	for (uint i = 0; i < degree; ++i) //TODO: ciclo inutile, basta mettere piú 1 a ogni elemento della lista
 	{
 		uint neighID = graphStruct->neighs[graphStruct->neighIndex[idx] + i];
 		
@@ -102,18 +102,14 @@ __global__ void findISLDF(Coloring* coloring, GraphStruct* graphStruct, bool* bi
 		{
 			if (bitmaps[bitmapIndex[idx] + i])
 			{
-				if (i < bestColor) //TODO: find another way
 					bestColor = i;
-					//break;
+					break;
 			}
 		}
 		coloring->coloring[idx] = bestColor;
 		coloring->coloredNodes[idx] = true;
 		printf("colored: %d, best color: %d: \n", idx, coloring->coloring[idx]);
-		if (bestColor > coloring->numOfColors)
-		{
-			coloring->numOfColors = bestColor; // possibile race, potrei computarlo nella print
-		}
+		
 		for (uint i = 0; i < deg; i++) {
 			uint neighID = graphStruct->neighs[offset + i];
 			if (!coloring->coloredNodes[neighID])
@@ -186,11 +182,94 @@ Coloring* Colorer::LDFColoring()
 	return m_Coloring;
 }
 
-Coloring* Colorer::SeqCPURandomPriorityColoring()
+Coloring* Colorer::RandomPriorityColoringCPUSequential()
 {
 	// DAG
 	Graph dag(Graph::MemoryEnum::HostAllocated);
 	m_Graph->BuildRandomDAG(dag);
+
+	// temp data inizialization
+	uint bitCount = (m_GraphStruct->nodeCount + (int)(m_GraphStruct->edgeCount + 1) / 2);
+	std::vector<bool> bitmaps(bitCount, true);
+	std::vector<uint> bitmapIndex(m_GraphStruct->nodeCount + 1);
+	std::vector<uint> inboundCounts(m_GraphStruct->nodeCount, 0);
+	GraphStruct* dagStruct = dag.getStruct();
+	for (int i = 0; i < dag.GetEdgeCount(); ++i)
+		inboundCounts[dagStruct->neighs[i]]++;
+	for (int i = 1; i < m_GraphStruct->nodeCount + 1; i++)
+		bitmapIndex[i] = bitmapIndex[i - 1] + m_InboundCounts[i - 1] + 1;
+
+	// JP Coloring
+	m_Coloring->numOfColors = 0;
+	while (m_Coloring->uncoloredFlag)
+	{
+		m_Coloring->uncoloredFlag = false;
+		for (int i = 0; i < m_GraphStruct->nodeCount; ++i)
+		{
+			if (m_Coloring->coloring[i])
+				continue;
+
+			uint offset = dagStruct->neighIndex[i];
+			uint deg = dagStruct->neighIndex[i + 1] - dagStruct->neighIndex[i];
+
+			if (inboundCounts[i] == 0) // Ready node
+			{
+				int colorCount = bitmapIndex[i + 1] - bitmapIndex[i];
+				printf("I'm %d, total colors: %d\n", i, colorCount);
+
+				int bestColor = colorCount;
+				for (int j = 0; j < colorCount; ++j)
+				{
+					if (bitmaps[bitmapIndex[i] + j])
+					{
+						if (j < bestColor)
+						{
+							//TODO: find another way
+							bestColor = j;
+							break;
+						}
+					}
+				}
+				m_Coloring->coloring[i] = bestColor;
+				m_Coloring->coloredNodes[i] = true;
+				printf("colored: %d, best color: %d: \n", i, m_Coloring->coloring[i]);
+				if (bestColor > m_Coloring->numOfColors)
+				{
+					m_Coloring->numOfColors = bestColor; // possibile race, potrei computarlo nella print
+				}
+				for (uint j = 0; j < deg; j++) {
+					uint neighID = dagStruct->neighs[offset + j];
+					inboundCounts[neighID]--;
+					bitmaps[bitmapIndex[neighID] + bestColor] = 0;
+					
+				}
+			}
+			else
+			{
+				m_Coloring->uncoloredFlag = true;
+			}
+		}
+	}
+	return m_Coloring;
+}
+
+Coloring* RandomPriorityColoringCPUSequentialV2(Graph& graph)
+{
+	// Alloc and Init returning struct
+	Coloring* coloring;
+	int n = graph.getStruct()->nodeCount;
+	mallocOnHost(coloring, n);
+	coloring->uncoloredFlag = true;
+	coloring->numOfColors = 0;
+
+	return nullptr;
+}
+
+void mallocOnHost(Coloring* coloring, unsigned n)
+{
+	coloring = (Coloring*)malloc(sizeof(Coloring));
+	coloring->coloring = (uint*)calloc(n, sizeof(uint));
+	coloring->coloredNodes = (bool*)calloc(n, sizeof(bool));
 }
 
 Coloring* RandomPriorityColoring(GraphStruct* graphStruct) {

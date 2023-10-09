@@ -5,7 +5,7 @@
 #include <iostream>
 
 int main(void) {
-	unsigned int n = 1000;		 // number of nodes for random graphs
+	unsigned int n = 10000;		 // number of nodes for random graphs
 	float prob = .02;				    // density (percentage) for random graphs
 	std::default_random_engine engine{ 0 };  // fixed seed
 
@@ -28,15 +28,21 @@ int main(void) {
 		cudaDeviceSynchronize();
 	}
 
-	// GPU Luby-JP greedy coloring
-	//Coloring* coloring = RandomPriorityColoring(graphStruct);
+	//-------------- START TIME ----------------//
+	double start = seconds();
+
+	
 	Colorer colorer(&graph);
-	Coloring* coloring2 = colorer.LDFColoring();
+	Coloring* coloring = RandomPriorityColoring(graphStruct); //0.35 10000 .02
+	//Coloring* coloring = colorer.LDFColoring(); //2.585 10000 .02
 	//printColoring(coloring, graphStruct, 1);
-	printColoring(coloring2, graphStruct, 1);
+
+	double stop = seconds();
+	//-------------- END TIME ----------------//
+
+	printColoring(coloring, graphStruct, 1);
+
+	std::cout << elapsedTime(start, stop);
 
 	return EXIT_SUCCESS;
 }
-
-
-// il bool memory lo metto nel randgrapg

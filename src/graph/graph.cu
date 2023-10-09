@@ -109,12 +109,33 @@ void Graph::BuildRandomDAG(Graph& dag)
 		dag.AllocHost();
 	
 	// Create an array or random priorities
-	unsigned int* priorities = new unsigned int[graphStruct->nodeCount];
+	float* priorities = new float[graphStruct->nodeCount];
+	std::default_random_engine engine{ 0 };  // fixed seed
+	uniform_real_distribution<> randR(0.0, std::numeric_limits<float>::max());
+	for (int i = 0; i < graphStruct->nodeCount; ++i)
+	{
+		float r = randR(engine);
+		priorities[i] = r;
+	}
 
-
-
-
-
+	//build dag
+	int k = 0;
+	for (int i = 0; i < graphStruct->nodeCount; ++i)
+	{
+		float priority = priorities[i];
+		int degree = graphStruct->deg(i);
+		for (int j = 0; j < degree; ++j)
+		{
+			unsigned int neighID = graphStruct->neighs[graphStruct->neighIndex[i] + j];
+			float neighPriority = priorities[neighID];
+			if (priority > neighPriority || (priority == neighPriority && i > neighID))
+			{
+				dag.graphStruct->neighs[k] = neighID;
+				++k;
+			}
+		}
+		dag.graphStruct->neighIndex[i + 1] = k;
+	}
 	delete[] priorities;
 }
 
@@ -138,6 +159,11 @@ void Graph::getLDFDag(GraphStruct* res)
 		}
 		res->neighIndex[i + 1] = k;
 	}
+}
+
+int Graph::GetEdgeCount()
+{
+	return graphStruct->edgeCount;
 }
 
 void Graph::AllocManaged()

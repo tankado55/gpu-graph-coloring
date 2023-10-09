@@ -54,4 +54,5 @@ public:
 	void print_d(GraphStruct *, bool);
 	GraphStruct* getStruct() {return graphStruct;}
 	void getLDFDag(GraphStruct*);
+	int GetEdgeCount();
 };

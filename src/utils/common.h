@@ -1,5 +1,5 @@
 
-#include <ctime>
+#include <time.h>
 #include <stdio.h>
 
 #include "driver_types.h"
@@ -74,6 +74,15 @@ inline void device_name() {
     CHECK(cudaGetDeviceProperties(&deviceProp, dev));
     printf("device %d: %s\n", dev, deviceProp.name);
     CHECK(cudaSetDevice(dev));
+}
+
+inline double seconds() {
+    return clock();
+
+}
+
+inline double elapsedTime(double start, double end) {
+    return ((double)(end - start)) / CLOCKS_PER_SEC;
 }
 
 typedef unsigned long ulong;

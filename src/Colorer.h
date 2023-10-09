@@ -13,7 +13,7 @@ struct Coloring {
 	bool* coloredNodes;
 };
 
-// probabilmente lo cancello, non ha molto senso tenersi lo stato dei colori
+// probabilmente lo cancello, non ha molto senso tenersi lo stato dei colori fuori dalla GPU
 struct ColoringUtils {
 	int* availableColorIndex{ nullptr };
 	int* availableColors{ nullptr };
@@ -30,10 +30,11 @@ private:
 public:
 	Colorer(Graph*);
 	Coloring* LDFColoring();
-	Coloring* SeqCPURandomPriorityColoring();
+	Coloring* RandomPriorityColoringCPUSequential();
 	~Colorer();
 };
 
+Coloring* RandomPriorityColoringCPUSequentialV2();
 Coloring* RandomPriorityColoring(GraphStruct*);
 void printColoring(Coloring*, GraphStruct*, bool);
 __global__ void init(uint seed, curandState_t*, uint*, uint);
