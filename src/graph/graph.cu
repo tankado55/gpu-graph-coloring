@@ -190,6 +190,8 @@ int Graph::GetEdgeCount()
 	return graphStruct->edgeCount;
 }
 
+
+
 void Graph::AllocManaged()
 {
 	CHECK(cudaMallocManaged(&(graphStruct->neighIndex), (graphStruct->nodeCount + 1) * sizeof(unsigned)));
@@ -206,6 +208,15 @@ void Graph::AllocHost()
 {
 	graphStruct->neighs = new unsigned[graphStruct->edgeCount] {};
 	graphStruct->neighIndex = new unsigned[graphStruct->nodeCount + 1] {};  // starts by zero
+}
+
+void Graph::AllocDagOnDevice(GraphStruct* dag)
+{
+	CHECK(cudaMalloc((void**)&dag, sizeof(GraphStruct)));
+	dag->nodeCount = graphStruct->nodeCount;
+	dag->edgeCount = (graphStruct->edgeCount + 1) / 2;
+	CHECK(cudaMalloc((void**)&dag->neighIndex, (dag->nodeCount + 1) * sizeof(uint)));
+	CHECK(cudaMalloc((void**)&dag->neighs, dag->edgeCount * sizeof(uint)));
 }
 
 /**

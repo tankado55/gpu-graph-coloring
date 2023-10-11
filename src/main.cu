@@ -32,8 +32,9 @@ int main(void) {
 	double start = seconds();
 
 	
-	Colorer colorer(&graph);
-	Coloring* coloring = RandomPriorityColoring(graphStruct); //0.35 10000 .02
+	//Colorer colorer(&graph);
+	//Coloring* coloring = RandomPriorityColoring(graphStruct); //0.35 10000 .02  msi: 0.532
+	Coloring* coloring = RandomPriorityColoringV2(graph); // 
 	//Coloring* coloring = colorer.LDFColoring(); //2.585 10000 .02
 	//printColoring(coloring, graphStruct, 1);
 

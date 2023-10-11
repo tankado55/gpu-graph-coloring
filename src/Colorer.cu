@@ -125,6 +125,8 @@ __global__ void findISLDF(Coloring* coloring, GraphStruct* graphStruct, bool* bi
 	}
 }
 
+
+
 Coloring* Colorer::LDFColoring()
 {
 	dim3 blockDim(THREADxBLOCK);
@@ -253,35 +255,95 @@ Coloring* Colorer::RandomPriorityColoringCPUSequential()
 	return m_Coloring;
 }
 
-Coloring* RandomPriorityColoringV2(Graph& graph)
-{
-	// Alloc and Init returning struct
-	Coloring* coloring;
-	int n = graph.getStruct()->nodeCount;
-	mallocOnHost(coloring, n);
-	coloring->uncoloredFlag = true;
-	coloring->numOfColors = 0;
-
-	// Parallel DAG
-	GraphStruct* dag;
-	graph.AllocDagOnDevice(dag);
-	// Init DAG parallel
-
-
-
-
-
-	// temp data inizialization
-
-	return nullptr;
-}
-
 void mallocOnHost(Coloring* coloring, unsigned n)
 {
 	coloring = (Coloring*)malloc(sizeof(Coloring));
 	coloring->coloring = (uint*)calloc(n, sizeof(uint));
 	coloring->coloredNodes = (bool*)calloc(n, sizeof(bool));
 }
+
+__global__ void calculateInbounds(GraphStruct* graphStruct, unsigned int* inboundCounts, unsigned int* priorities, int n) {
+	uint idx = blockIdx.x * blockDim.x + threadIdx.x;
+	if (idx >= n)
+		return;
+
+	uint degree = graphStruct->neighIndex[idx + 1] - graphStruct->neighIndex[idx];
+	//printf("node(%d [myDegree: %d] \n", idx, degree);
+
+	inboundCounts[idx] = 0;
+	for (uint i = 0; i < degree; ++i)
+	{
+		uint neighID = graphStruct->neighs[graphStruct->neighIndex[idx] + i];
+		if (priorities[idx] > priorities[neighID])
+		{
+			atomicAdd(&inboundCounts[neighID], 1);
+			//printf(" atomicAdd node(%d -> %d [count: %d] \n", idx, neighID, inboundCounts[neighID]);
+		}
+		else if (priorities[idx] == priorities[neighID] && idx > neighID)
+		{
+			atomicAdd(&inboundCounts[neighID], 1);
+			//printf(" atomicAdd node(%d -> %d [count: %d] \n", idx, neighID, inboundCounts[neighID]);
+		}
+	}
+}
+
+// provo prima a fare la versione senza dag, solo con inbound count e senza bit
+Coloring* RandomPriorityColoringV2(Graph& graph)
+{
+	// Alloc and Init returning struct TODO: mancano i memset
+	Coloring* coloring;
+	int n = graph.getStruct()->nodeCount;
+	CHECK(cudaMallocManaged(&coloring, sizeof(Coloring)));
+	CHECK(cudaMallocManaged(&(coloring->coloring), n * sizeof(uint)));
+	CHECK(cudaMallocManaged(&(coloring->coloredNodes), n * sizeof(uint)));
+	coloring->uncoloredFlag = true;
+	coloring->numOfColors = 0;
+	GraphStruct* graphStruct = graph.getStruct();
+
+	// Generate random node priorities
+	curandState_t* states;
+	uint* priorities;
+	cudaMalloc((void**)&states, n * sizeof(curandState_t));
+	cudaMalloc((void**)&priorities, n * sizeof(uint));
+	dim3 blockDim(THREADxBLOCK);
+	dim3 gridDim((n + blockDim.x - 1) / blockDim.x, 1, 1);
+	uint seed = 0;
+	InitRandomPriorities <<<gridDim, blockDim >>> (seed, states, priorities, n);
+	cudaDeviceSynchronize();
+	
+	// Calculate inbound counters
+	uint* inboundCounts;
+	CHECK(cudaMalloc((void **) &inboundCounts, n * sizeof(uint)));
+	calculateInbounds <<<gridDim, blockDim >>> (graphStruct, inboundCounts, priorities, n);
+	cudaDeviceSynchronize();
+
+	// Color TODO: tieni il flag sulla gpu e itera con gli stream
+	while (coloring->uncoloredFlag) {
+		coloring->uncoloredFlag = false;
+		coloring->numOfColors++;
+		findIS <<< gridDim, blockDim >>> (coloring, graphStruct, priorities);
+		cudaDeviceSynchronize();
+	}
+
+	// Free
+	cudaFree(states);
+	cudaFree(priorities);
+	cudaFree(inboundCounts);
+	//cudaFree(coloring);
+	//cudaFree(coloring->coloring);
+	//cudaFree(coloring->coloredNodes);
+
+	return coloring;
+}
+
+
+
+__global__ void buildParallelDag()
+{
+
+}
+
+
 
 Coloring* RandomPriorityColoring(GraphStruct* graphStruct)
 {
@@ -303,7 +365,7 @@ Coloring* RandomPriorityColoring(GraphStruct* graphStruct)
 	dim3 threads(THREADxBLOCK);
 	dim3 blocks((graphStruct->nodeCount + threads.x - 1) / threads.x, 1, 1);
 	uint seed = 0;
-	init <<< blocks, threads >>> (seed, states, weigths, n);
+	InitRandomPriorities <<< blocks, threads >>> (seed, states, weigths, n);
 	cudaDeviceSynchronize();
 	// start coloring (dyn. parall.)
 	LubyJPcolorer(col, graphStruct, weigths);
@@ -316,7 +378,8 @@ Coloring* RandomPriorityColoring(GraphStruct* graphStruct)
 /**
  * find an IS
  */
-__global__ void findIS(Coloring* col, GraphStruct* graphStruct, uint* weights) {
+__global__ void findIS(Coloring* col, GraphStruct* graphStruct, uint* weights)
+{
 	uint idx = threadIdx.x + blockDim.x * blockIdx.x;
 
 	if (idx >= graphStruct->nodeCount)
@@ -344,17 +407,64 @@ __global__ void findIS(Coloring* col, GraphStruct* graphStruct, uint* weights) {
 		col->uncoloredFlag = true;
 }
 
+__global__ void colorWithInboundColor(Coloring* coloring, GraphStruct* graphStruct, uint* inboundCounts)
+{
+	uint idx = threadIdx.x + blockDim.x * blockIdx.x;
+
+	if (idx >= graphStruct->nodeCount) //é giusto
+		return;
+
+	if (coloring->coloredNodes[idx])
+		return;
+
+	//printf("GPU - I'm %d, myInbound: %d\n", idx, inboundCounts[idx]);
+
+	uint offset = graphStruct->neighIndex[idx];
+	uint deg = graphStruct->neighIndex[idx + 1] - graphStruct->neighIndex[idx];
+
+	if (inboundCounts[idx] == 0) // Ready node
+	{
+		int colorCount = bitmapIndex[idx + 1] - bitmapIndex[idx];
+		printf("I'm %d, total colors: %d\n", idx, colorCount);
+
+		int bestColor = colorCount;
+		for (int i = 0; i < colorCount; ++i)
+		{
+			if (bitmaps[bitmapIndex[idx] + i])
+			{
+				bestColor = i;
+				break;
+			}
+		}
+		coloring->coloring[idx] = bestColor;
+		coloring->coloredNodes[idx] = true;
+		printf("colored: %d, best color: %d: \n", idx, coloring->coloring[idx]);
+
+		for (uint i = 0; i < deg; i++) {
+			uint neighID = graphStruct->neighs[offset + i];
+			if (!coloring->coloredNodes[neighID])
+			{
+				atomicAdd(&inboundCounts[neighID], -1);
+				bitmaps[bitmapIndex[neighID] + bestColor] = 0;
+			}
+		}
+	}
+	else
+	{
+		coloring->uncoloredFlag = true;
+	}
+}
+
 /**
  *  this GPU kernel takes an array of states, and an array of ints, and puts a random int into each
  */
-__global__ void init(uint seed, curandState_t* states, uint* numbers, uint n) {
+__global__ void InitRandomPriorities(uint seed, curandState_t* states, uint* numbers, uint n) {
 	uint idx = blockIdx.x * blockDim.x + threadIdx.x;
 	if (idx > n)
 		return;
 	curand_init(seed, idx, 0, &states[idx]);
 	numbers[idx] = curand(&states[idx]) % n * n;
 }
-
 
 
 
