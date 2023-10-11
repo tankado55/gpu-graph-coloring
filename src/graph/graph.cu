@@ -139,6 +139,28 @@ void Graph::BuildRandomDAG(Graph& dag)
 	delete[] priorities;
 }
 
+void Graph::BuildLDFDagV2(Graph& dag) //TODO: check all the code
+{
+	dag.graphStruct->nodeCount = graphStruct->nodeCount;
+	dag.graphStruct->edgeCount = (graphStruct->edgeCount + 1) / 2;
+	int k = 0;
+	for (int i = 0; i < graphStruct->nodeCount; ++i)
+	{
+		int degree = graphStruct->deg(i);
+		for (int j = 0; j < degree; ++j)
+		{
+			unsigned int neighID = graphStruct->neighs[graphStruct->neighIndex[i] + j];
+			unsigned int neighDegree = graphStruct->deg(neighID);
+			if (degree > neighDegree || (degree == neighDegree && i > neighID))
+			{
+				dag.graphStruct->neighs[k] = neighID;
+				++k;
+			}
+		}
+		dag.graphStruct->neighIndex[i + 1] = k;
+	}
+}
+
 void Graph::getLDFDag(GraphStruct* res)
 {
 	res->nodeCount = graphStruct->nodeCount;
@@ -160,6 +182,8 @@ void Graph::getLDFDag(GraphStruct* res)
 		res->neighIndex[i + 1] = k;
 	}
 }
+
+
 
 int Graph::GetEdgeCount()
 {

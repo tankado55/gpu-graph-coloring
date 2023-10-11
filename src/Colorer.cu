@@ -253,7 +253,7 @@ Coloring* Colorer::RandomPriorityColoringCPUSequential()
 	return m_Coloring;
 }
 
-Coloring* RandomPriorityColoringCPUSequentialV2(Graph& graph)
+Coloring* RandomPriorityColoringV2(Graph& graph)
 {
 	// Alloc and Init returning struct
 	Coloring* coloring;
@@ -261,6 +261,17 @@ Coloring* RandomPriorityColoringCPUSequentialV2(Graph& graph)
 	mallocOnHost(coloring, n);
 	coloring->uncoloredFlag = true;
 	coloring->numOfColors = 0;
+
+	// Parallel DAG
+	GraphStruct* dag;
+	graph.AllocDagOnDevice(dag);
+	// Init DAG parallel
+
+
+
+
+
+	// temp data inizialization
 
 	return nullptr;
 }
@@ -272,9 +283,9 @@ void mallocOnHost(Coloring* coloring, unsigned n)
 	coloring->coloredNodes = (bool*)calloc(n, sizeof(bool));
 }
 
-Coloring* RandomPriorityColoring(GraphStruct* graphStruct) {
+Coloring* RandomPriorityColoring(GraphStruct* graphStruct)
+{
 	// set coloring struct
-
 	Coloring* col;
 	CHECK(cudaMallocManaged(&col, sizeof(Coloring)));
 	uint n = graphStruct->nodeCount;
