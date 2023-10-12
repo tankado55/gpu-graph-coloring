@@ -287,54 +287,7 @@ __global__ void calculateInbounds(GraphStruct* graphStruct, unsigned int* inboun
 	}
 }
 
-// provo prima a fare la versione senza dag, solo con inbound count e senza bit
-Coloring* RandomPriorityColoringV2(Graph& graph)
-{
-	// Alloc and Init returning struct TODO: mancano i memset
-	Coloring* coloring;
-	int n = graph.getStruct()->nodeCount;
-	CHECK(cudaMallocManaged(&coloring, sizeof(Coloring)));
-	CHECK(cudaMallocManaged(&(coloring->coloring), n * sizeof(uint)));
-	CHECK(cudaMallocManaged(&(coloring->coloredNodes), n * sizeof(uint)));
-	coloring->uncoloredFlag = true;
-	coloring->numOfColors = 0;
-	GraphStruct* graphStruct = graph.getStruct();
 
-	// Generate random node priorities
-	curandState_t* states;
-	uint* priorities;
-	cudaMalloc((void**)&states, n * sizeof(curandState_t));
-	cudaMalloc((void**)&priorities, n * sizeof(uint));
-	dim3 blockDim(THREADxBLOCK);
-	dim3 gridDim((n + blockDim.x - 1) / blockDim.x, 1, 1);
-	uint seed = 0;
-	InitRandomPriorities <<<gridDim, blockDim >>> (seed, states, priorities, n);
-	cudaDeviceSynchronize();
-	
-	// Calculate inbound counters
-	uint* inboundCounts;
-	CHECK(cudaMalloc((void **) &inboundCounts, n * sizeof(uint)));
-	calculateInbounds <<<gridDim, blockDim >>> (graphStruct, inboundCounts, priorities, n);
-	cudaDeviceSynchronize();
-
-	// Color TODO: tieni il flag sulla gpu e itera con gli stream
-	while (coloring->uncoloredFlag) {
-		coloring->uncoloredFlag = false;
-		coloring->numOfColors++;
-		findIS <<< gridDim, blockDim >>> (coloring, graphStruct, priorities);
-		cudaDeviceSynchronize();
-	}
-
-	// Free
-	cudaFree(states);
-	cudaFree(priorities);
-	cudaFree(inboundCounts);
-	//cudaFree(coloring);
-	//cudaFree(coloring->coloring);
-	//cudaFree(coloring->coloredNodes);
-
-	return coloring;
-}
 
 
 
@@ -345,47 +298,19 @@ __global__ void buildParallelDag()
 
 
 
-Coloring* RandomPriorityColoring(GraphStruct* graphStruct)
-{
-	// set coloring struct
-	Coloring* col;
-	CHECK(cudaMallocManaged(&col, sizeof(Coloring)));
-	uint n = graphStruct->nodeCount;
-	col->uncoloredFlag = true;
 
-	// cudaMalloc for arrays of struct Coloring
-	CHECK(cudaMallocManaged(&(col->coloring), n * sizeof(uint)));
-	memset(col->coloring, 0, n);
-
-	// allocate space on the GPU for the random states
-	curandState_t* states;
-	uint* weigths;
-	cudaMalloc((void**)&states, n * sizeof(curandState_t));
-	cudaMalloc((void**)&weigths, n * sizeof(uint));
-	dim3 threads(THREADxBLOCK);
-	dim3 blocks((graphStruct->nodeCount + threads.x - 1) / threads.x, 1, 1);
-	uint seed = 0;
-	InitRandomPriorities <<< blocks, threads >>> (seed, states, weigths, n);
-	cudaDeviceSynchronize();
-	// start coloring (dyn. parall.)
-	LubyJPcolorer(col, graphStruct, weigths);
-
-	cudaFree(states);
-	cudaFree(weigths);
-	return col;
-}
 
 /**
  * find an IS
  */
-__global__ void findIS(Coloring* col, GraphStruct* graphStruct, uint* weights)
+__global__ void findIS(Coloring* col, GraphStruct* graphStruct, uint* weights, unsigned* buffer, bool* filledBuffer)
 {
 	uint idx = threadIdx.x + blockDim.x * blockIdx.x;
 
 	if (idx >= graphStruct->nodeCount)
 		return;
 
-	if (col->coloring[idx])
+	if (col->coloredNodes[idx])
 		return;
 
 	uint offset = graphStruct->neighIndex[idx];
@@ -394,24 +319,86 @@ __global__ void findIS(Coloring* col, GraphStruct* graphStruct, uint* weights)
 	bool candidate = true;
 	for (uint j = 0; j < deg; j++) {
 		uint neighID = graphStruct->neighs[offset + j];
-		if (!col->coloring[neighID] &&
-			((weights[idx] < weights[neighID]) ||
-				((weights[idx] == weights[neighID]) && idx < neighID))) {
+
+		if (!col->coloredNodes[neighID] &&
+			((weights[idx] < weights[neighID]) || ((weights[idx] == weights[neighID]) && idx < neighID))) {
 			candidate = false;
 		}
 	}
 	if (candidate) {
-		col->coloring[idx] = col->numOfColors;
+		buffer[idx] = col->numOfColors;
+		filledBuffer[idx] = true;
+		//printf("candidate: %d, color: %d\n", idx, col->numOfColors);
 	}
 	else
+	{
 		col->uncoloredFlag = true;
+		//printf("not candidate: %d, color: %d\n", idx, col->numOfColors);
+	}
 }
 
-__global__ void colorWithInboundColor(Coloring* coloring, GraphStruct* graphStruct, uint* inboundCounts)
+__global__ void applyBuffer(Coloring* coloring, unsigned* buffer, bool* filledBuffer, unsigned n)
 {
 	uint idx = threadIdx.x + blockDim.x * blockIdx.x;
 
-	if (idx >= graphStruct->nodeCount) //é giusto
+	if (idx >= n)
+		return;
+
+	if (coloring->coloredNodes[idx])
+		return;
+
+	if (!filledBuffer[idx])
+		return;
+
+	coloring->coloring[idx] = buffer[idx];
+	coloring->coloredNodes[idx] = true;
+	filledBuffer[idx] = false;
+	//printf("buffer applied: %d, color: %d\n", idx, coloring->coloring[idx]);
+
+}
+
+__global__ void applyBufferWithInboundCounters(Coloring* coloring, GraphStruct* graphStruct, unsigned* priorities, unsigned* inboundCounts,unsigned* buffer, bool* filledBuffer)
+{
+	uint idx = threadIdx.x + blockDim.x * blockIdx.x;
+
+	if (idx >= graphStruct->nodeCount)
+		return;
+
+	if (coloring->coloredNodes[idx])
+		return;
+
+	if (!filledBuffer[idx])
+		return;
+
+	uint offset = graphStruct->neighIndex[idx];
+	uint deg = graphStruct->neighIndex[idx + 1] - graphStruct->neighIndex[idx];
+
+	for (uint i = 0; i < deg; i++)
+	{
+		//TODO: check if there is arc in the dag, it could cause troubles when I will implement shortcuts
+		uint neighID = graphStruct->neighs[offset + i];
+		if (!coloring->coloredNodes[neighID] &&
+			((priorities[idx] > priorities[neighID]) || ((priorities[idx] == priorities[neighID]) && idx > neighID)))
+		{
+			atomicAdd(&inboundCounts[neighID], -1);
+			//if (neighID == 750)
+			//	printf("I'm: %d, removed arc to: %d: \n", idx, neighID);
+		}
+		//printf("I'm: %d, removed arc to: %d: \n", idx, neighID);
+		
+	}
+	coloring->coloring[idx] = buffer[idx];
+	coloring->coloredNodes[idx] = true;
+	filledBuffer[idx] = false;
+	//printf("buffer applied: %d, color: %d\n", idx, coloring->coloring[idx]);
+
+}
+
+__global__ void colorWithInboundCounters(Coloring* coloring, GraphStruct* graphStruct, uint* inboundCounts, uint* buffer, bool* filledBuffer)
+{
+	uint idx = threadIdx.x + blockDim.x * blockIdx.x;
+
+	if (idx >= graphStruct->nodeCount)
 		return;
 
 	if (coloring->coloredNodes[idx])
@@ -419,35 +406,16 @@ __global__ void colorWithInboundColor(Coloring* coloring, GraphStruct* graphStru
 
 	//printf("GPU - I'm %d, myInbound: %d\n", idx, inboundCounts[idx]);
 
-	uint offset = graphStruct->neighIndex[idx];
-	uint deg = graphStruct->neighIndex[idx + 1] - graphStruct->neighIndex[idx];
+	
 
+	//if (idx == 750)
+	//	printf("uncolored: %d, still: %d -- best color: %d: \n", idx, inboundCounts[idx], coloring->numOfColors);
 	if (inboundCounts[idx] == 0) // Ready node
 	{
-		int colorCount = bitmapIndex[idx + 1] - bitmapIndex[idx];
-		printf("I'm %d, total colors: %d\n", idx, colorCount);
+		buffer[idx] = coloring->numOfColors;
+		filledBuffer[idx] = true;
 
-		int bestColor = colorCount;
-		for (int i = 0; i < colorCount; ++i)
-		{
-			if (bitmaps[bitmapIndex[idx] + i])
-			{
-				bestColor = i;
-				break;
-			}
-		}
-		coloring->coloring[idx] = bestColor;
-		coloring->coloredNodes[idx] = true;
-		printf("colored: %d, best color: %d: \n", idx, coloring->coloring[idx]);
-
-		for (uint i = 0; i < deg; i++) {
-			uint neighID = graphStruct->neighs[offset + i];
-			if (!coloring->coloredNodes[neighID])
-			{
-				atomicAdd(&inboundCounts[neighID], -1);
-				bitmaps[bitmapIndex[neighID] + bestColor] = 0;
-			}
-		}
+		
 	}
 	else
 	{
@@ -466,26 +434,6 @@ __global__ void InitRandomPriorities(uint seed, curandState_t* states, uint* num
 	numbers[idx] = curand(&states[idx]) % n * n;
 }
 
-
-
-
-
-/**
- * Luby IS & Jones−Plassmann colorer
- */
-void LubyJPcolorer(Coloring* col, GraphStruct* graphStruct, uint* weights) {
-	dim3 threads(THREADxBLOCK);
-	dim3 blocks((graphStruct->nodeCount + threads.x - 1) / threads.x, 1, 1);
-
-	// loop on ISs covering the graph
-	col->numOfColors = 0;
-	while (col->uncoloredFlag) {
-		col->uncoloredFlag = false;
-		col->numOfColors++;
-		findIS <<< blocks, threads >>> (col, graphStruct, weights);
-		cudaDeviceSynchronize();
-	}
-}
 
 
 /**
@@ -507,4 +455,192 @@ void printColoring(Coloring* col, GraphStruct* graphStruct, bool verbose) {
 		std::cout << "\n";
 	}
 }
+
+Coloring* RandomPriorityColoring(Graph& graph) // no inboundsCount, no bitmap no dag
+{
+	// Alloc and Init returning struct
+	Coloring* coloring;
+	int n = graph.getStruct()->nodeCount;
+	CHECK(cudaMallocManaged(&coloring, sizeof(Coloring)));
+	CHECK(cudaMallocManaged(&(coloring->coloring), n * sizeof(uint)));
+	CHECK(cudaMallocManaged(&(coloring->coloredNodes), n * sizeof(bool)));
+	memset(coloring->coloring, 0, n * sizeof(uint));
+	memset(coloring->coloredNodes, 0, n * sizeof(bool));
+	coloring->uncoloredFlag = true;
+	coloring->numOfColors = 0;
+	GraphStruct* graphStruct = graph.getStruct();
+
+	// Generate random node priorities
+	curandState_t* states;
+	uint* priorities;
+	cudaMalloc((void**)&states, n * sizeof(curandState_t));
+	cudaMalloc((void**)&priorities, n * sizeof(uint));
+	dim3 blockDim(THREADxBLOCK);
+	dim3 gridDim((n + blockDim.x - 1) / blockDim.x, 1, 1);
+	uint seed = 0;
+	InitRandomPriorities << <gridDim, blockDim >> > (seed, states, priorities, n);
+	cudaDeviceSynchronize();
+
+	// Alloc buffer needed to synchronize the coloring
+	unsigned* buffer;
+	cudaMalloc((void**)&buffer, n * sizeof(unsigned));
+	cudaMemset(buffer, 0, n * sizeof(unsigned));
+	bool* filledBuffer;
+	cudaMalloc((void**)&filledBuffer, n * sizeof(bool));
+	cudaMemset(filledBuffer, 0, n * sizeof(bool));
+
+	// Color TODO: tieni il flag sulla gpu e itera con gli stream
+	coloring->numOfColors = 0;
+	while (coloring->uncoloredFlag) {
+		coloring->uncoloredFlag = false;
+		findIS << <gridDim, blockDim >> > (coloring, graphStruct, priorities, buffer, filledBuffer);
+		cudaDeviceSynchronize();
+		applyBuffer << <gridDim, blockDim >> > (coloring, buffer, filledBuffer, n);
+		cudaDeviceSynchronize();
+		coloring->numOfColors++;
+	}
+
+	// Free
+	cudaFree(states);
+	cudaFree(priorities);
+	cudaFree(buffer);
+	cudaFree(filledBuffer);
+	//cudaFree(coloring);
+	//cudaFree(coloring->coloring);
+	//cudaFree(coloring->coloredNodes);
+
+	return coloring;
+}
+
+Coloring* RandomPriorityColoringV2(Graph& graph) // Versione senza dag, solo con inbound count e senza bitmaps
+{
+	// Alloc and Init returning struct
+	Coloring* coloring;
+	int n = graph.getStruct()->nodeCount;
+	CHECK(cudaMallocManaged(&coloring, sizeof(Coloring)));
+	CHECK(cudaMallocManaged(&(coloring->coloring), n * sizeof(uint)));
+	CHECK(cudaMallocManaged(&(coloring->coloredNodes), n * sizeof(bool)));
+	memset(coloring->coloring, 0, n * sizeof(uint));
+	memset(coloring->coloredNodes, 0, n * sizeof(bool));
+	coloring->uncoloredFlag = true;
+	coloring->numOfColors = 0;
+	GraphStruct* graphStruct = graph.getStruct();
+
+	// Generate random node priorities
+	curandState_t* states;
+	uint* priorities;
+	cudaMalloc((void**)&states, n * sizeof(curandState_t));
+	cudaMalloc((void**)&priorities, n * sizeof(uint));
+	dim3 blockDim(THREADxBLOCK);
+	dim3 gridDim((n + blockDim.x - 1) / blockDim.x, 1, 1);
+	uint seed = 0;
+	InitRandomPriorities << <gridDim, blockDim >> > (seed, states, priorities, n);
+	cudaDeviceSynchronize();
+
+	// Calculate inbound counters
+	uint* inboundCounts;
+	CHECK(cudaMalloc((void**)&inboundCounts, n * sizeof(uint)));
+	cudaMemset(inboundCounts, 0, n * sizeof(uint));
+	calculateInbounds << <gridDim, blockDim >> > (graphStruct, inboundCounts, priorities, n);
+	cudaDeviceSynchronize();
+
+	// Alloc buffer needed to synchronize the coloring
+	unsigned* buffer;
+	cudaMalloc((void**)&buffer, n * sizeof(unsigned));
+	cudaMemset(buffer, 0, n * sizeof(unsigned));
+	bool* filledBuffer;
+	cudaMalloc((void**)&filledBuffer, n * sizeof(bool));
+	cudaMemset(filledBuffer, 0, n * sizeof(bool));
+
+	// Color TODO: tieni il flag sulla gpu e itera con gli stream
+	coloring->numOfColors = 0;
+	while (coloring->uncoloredFlag) {
+		coloring->uncoloredFlag = false;
+		colorWithInboundCounters <<<gridDim, blockDim>>> (coloring, graphStruct, inboundCounts, buffer, filledBuffer);
+		cudaDeviceSynchronize();
+		applyBufferWithInboundCounters <<<gridDim, blockDim>>>(coloring, graphStruct, priorities, inboundCounts, buffer, filledBuffer);
+		cudaDeviceSynchronize();
+		coloring->numOfColors++;
+	}
+
+	// Free
+	cudaFree(states);
+	cudaFree(priorities);
+	cudaFree(inboundCounts);
+	cudaFree(buffer);
+	cudaFree(filledBuffer);
+	//cudaFree(coloring);
+	//cudaFree(coloring->coloring);
+	//cudaFree(coloring->coloredNodes);
+
+	return coloring;
+
+}
+
+Coloring* RandomPriorityColoringV3(Graph& graph) // V2 + bitmaps
+{
+	// Alloc and Init returning struct
+	Coloring* coloring;
+	int n = graph.getStruct()->nodeCount;
+	CHECK(cudaMallocManaged(&coloring, sizeof(Coloring)));
+	CHECK(cudaMallocManaged(&(coloring->coloring), n * sizeof(uint)));
+	CHECK(cudaMallocManaged(&(coloring->coloredNodes), n * sizeof(bool)));
+	memset(coloring->coloring, 0, n * sizeof(uint));
+	memset(coloring->coloredNodes, 0, n * sizeof(bool));
+	coloring->uncoloredFlag = true;
+	coloring->numOfColors = 0;
+	GraphStruct* graphStruct = graph.getStruct();
+
+	// Generate random node priorities
+	curandState_t* states;
+	uint* priorities;
+	cudaMalloc((void**)&states, n * sizeof(curandState_t));
+	cudaMalloc((void**)&priorities, n * sizeof(uint));
+	dim3 blockDim(THREADxBLOCK);
+	dim3 gridDim((n + blockDim.x - 1) / blockDim.x, 1, 1);
+	uint seed = 0;
+	InitRandomPriorities << <gridDim, blockDim >> > (seed, states, priorities, n);
+	cudaDeviceSynchronize();
+
+	// Calculate inbound counters
+	uint* inboundCounts;
+	CHECK(cudaMalloc((void**)&inboundCounts, n * sizeof(uint)));
+	cudaMemset(inboundCounts, 0, n * sizeof(uint));
+	calculateInbounds << <gridDim, blockDim >> > (graphStruct, inboundCounts, priorities, n);
+	cudaDeviceSynchronize();
+
+	// Alloc buffer needed to synchronize the coloring
+	unsigned* buffer;
+	cudaMalloc((void**)&buffer, n * sizeof(unsigned));
+	cudaMemset(buffer, 0, n * sizeof(unsigned));
+	bool* filledBuffer;
+	cudaMalloc((void**)&filledBuffer, n * sizeof(bool));
+	cudaMemset(filledBuffer, 0, n * sizeof(bool));
+
+	// Color TODO: tieni il flag sulla gpu e itera con gli stream
+	coloring->numOfColors = 0;
+	while (coloring->uncoloredFlag) {
+		coloring->uncoloredFlag = false;
+		colorWithInboundCounters <<<gridDim, blockDim>>> (coloring, graphStruct, inboundCounts, buffer, filledBuffer);
+		cudaDeviceSynchronize();
+		applyBufferWithInboundCounters <<<gridDim, blockDim>>>(coloring, graphStruct, priorities, inboundCounts, buffer, filledBuffer);
+		cudaDeviceSynchronize();
+		coloring->numOfColors++;
+	}
+
+	// Free
+	cudaFree(states);
+	cudaFree(priorities);
+	cudaFree(inboundCounts);
+	cudaFree(buffer);
+	cudaFree(filledBuffer);
+	//cudaFree(coloring);
+	//cudaFree(coloring->coloring);
+	//cudaFree(coloring->coloredNodes);
+
+	return coloring;
+
+}
+
+
 

@@ -36,9 +36,8 @@ public:
 
 Coloring* RandomPriorityColoringCPUSequentialV2();
 Coloring* RandomPriorityColoringV2(Graph& graph);
-Coloring* RandomPriorityColoring(GraphStruct*);
+Coloring* RandomPriorityColoring(Graph& graph);
 void printColoring(Coloring*, GraphStruct*, bool);
 __global__ void InitRandomPriorities(uint seed, curandState_t*, uint*, uint);
-void LubyJPcolorer(Coloring*, GraphStruct*, uint*);
 __global__ void findIS(Coloring*, GraphStruct*, uint*);
 __global__ void print_d(GraphStruct*, bool);

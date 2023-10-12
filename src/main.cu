@@ -2,10 +2,11 @@
 #include "Colorer.h"
 #include "utils/common.h"
 #include "graph/graph.h"
+#include "utils/ColoringValidator.h"
 #include <iostream>
 
 int main(void) {
-	unsigned int n = 10000;		 // number of nodes for random graphs
+	unsigned int n = 20000;		 // number of nodes for random graphs
 	float prob = .02;				    // density (percentage) for random graphs
 	std::default_random_engine engine{ 0 };  // fixed seed
 
@@ -28,22 +29,43 @@ int main(void) {
 		cudaDeviceSynchronize();
 	}
 
+	///////////////////DEBUG
+	//uint offset = graphStruct->neighIndex[6277];
+	//uint deg = graphStruct->neighIndex[6277 + 1] - graphStruct->neighIndex[6277];
+	
+	//printf("node: %d, deg %d: , index: %d,%d\n", 6277, deg, graphStruct->neighIndex[6277], graphStruct->neighIndex[6277 + 1]);
+	//for (int i = 0; i < deg; ++i)
+	//{
+	//	printf("neigh: %d\n", graphStruct->neighs[offset + i]);
+	//}
+	
+
+	//offset = graphStruct->neighIndex[9985];
+	//deg = graphStruct->neighIndex[9985 + 1] - graphStruct->neighIndex[9985];
+
+	//printf("node: %d, deg: %d\n", 9985, deg);
+	//for (int i = 0; i < deg; ++i)
+	//{
+	//	printf("neigh: %d\n", graphStruct->neighs[offset + i]);
+	//}
+
 	//-------------- START TIME ----------------//
 	double start = seconds();
 
 	
 	//Colorer colorer(&graph);
-	//Coloring* coloring = RandomPriorityColoring(graphStruct); //0.35 10000 .02  msi: 0.532
-	Coloring* coloring = RandomPriorityColoringV2(graph); // 
+	Coloring* coloring = RandomPriorityColoring(graph);     // 0.375 20k 1.509
+	//Coloring* coloring = RandomPriorityColoringV2(graph); // 0.352 20k 1.424 con inbounds
 	//Coloring* coloring = colorer.LDFColoring(); //2.585 10000 .02
-	//printColoring(coloring, graphStruct, 1);
 
 	double stop = seconds();
 	//-------------- END TIME ----------------//
 
 	printColoring(coloring, graphStruct, 1);
 
-	std::cout << elapsedTime(start, stop);
+	std::cout << elapsedTime(start, stop) << std::endl;
+
+	validateColoring(coloring, graphStruct);
 
 	return EXIT_SUCCESS;
 }
