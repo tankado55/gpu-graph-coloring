@@ -6,7 +6,7 @@
 #include <iostream>
 
 int main(void) {
-	unsigned int n = 20000;		 // number of nodes for random graphs
+	unsigned int n = 20000;		 // number of nodes for random graphs 16k 5.117.258 17k 5.777.572
 	float prob = .02;				    // density (percentage) for random graphs
 	std::default_random_engine engine{ 0 };  // fixed seed
 
@@ -21,6 +21,7 @@ int main(void) {
 
 	printf("start, edgeCount: %d\n", graphStruct->edgeCount);
 	printf("start, nodeCount: %d\n", graphStruct->nodeCount);
+	printf("start, maxDeg: %d\n", graphStruct->maxDeg);
 
 	// print small graph
 	if (n <= 128) {
@@ -54,14 +55,17 @@ int main(void) {
 
 	
 	//Colorer colorer(&graph);
-	Coloring* coloring = RandomPriorityColoring(graph);     // 0.375 20k 1.509
-	//Coloring* coloring = RandomPriorityColoringV2(graph); // 0.352 20k 1.424 con inbounds
-	//Coloring* coloring = colorer.LDFColoring(); //2.585 10000 .02
+	//Coloring* coloring = RandomPriorityColoring(graph);     // 0.375 20k 1.509 no inbound
+	//Coloring* coloring = RandomPriorityColoringV2(graph); // 0.352     20k 1.424 con inbounds 0.97 msi
+	//Coloring* coloring = RandomPriorityColoringV3(graph); //                                0.96 72 colors
+	Coloring* coloring = LDFColoringV3(graph);              //                                     70 colors
+	//test(graph);
 
 	double stop = seconds();
 	//-------------- END TIME ----------------//
 
-	printColoring(coloring, graphStruct, 1);
+	//printColoring(coloring, graphStruct, 1);
+	std::cout << coloring->numOfColors << std::endl;
 
 	std::cout << elapsedTime(start, stop) << std::endl;
 
