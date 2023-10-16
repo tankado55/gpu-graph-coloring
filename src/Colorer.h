@@ -35,9 +35,13 @@ public:
 };
 
 Coloring* RandomPriorityColoringCPUSequentialV2();
-Coloring* RandomPriorityColoringV2(Graph& graph);
 Coloring* RandomPriorityColoring(Graph& graph);
+Coloring* RandomPriorityColoringV2(Graph& graph);
+Coloring* RandomPriorityColoringV3(Graph& graph);
+Coloring* LDFColoringV3(Graph& graph);
 void printColoring(Coloring*, GraphStruct*, bool);
 __global__ void InitRandomPriorities(uint seed, curandState_t*, uint*, uint);
 __global__ void findIS(Coloring*, GraphStruct*, uint*);
 __global__ void print_d(GraphStruct*, bool);
+__global__ void applyBufferWithInboundCountersBitmaps(Coloring*, GraphStruct*, unsigned*, unsigned*, unsigned*, bool*, bool*, uint*);
+__global__ void colorWithInboundCountersBitmaps(Coloring*, GraphStruct*, uint*, uint*, bool*, bool*, uint*);
