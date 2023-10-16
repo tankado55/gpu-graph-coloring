@@ -149,7 +149,6 @@ Coloring* Colorer::LDFColoring()
 	uint bitCount = (m_GraphStruct->nodeCount + (int)(m_GraphStruct->edgeCount + 1) / 2);
 	CHECK(cudaMallocManaged(&(bitmaps), bitCount * sizeof(bool)));
 	memset(bitmaps, 1, bitCount * sizeof(bool));
-
 	uint* bitmapIndex;
 	CHECK(cudaMallocManaged(&bitmapIndex, (m_GraphStruct->nodeCount + 1) * sizeof(uint)));
 	cudaDeviceSynchronize();
@@ -262,6 +261,7 @@ void mallocOnHost(Coloring* coloring, unsigned n)
 	coloring->coloredNodes = (bool*)calloc(n, sizeof(bool));
 }
 
+//TODO: evita atomic add facendo il confronto al contrario
 __global__ void calculateInbounds(GraphStruct* graphStruct, unsigned int* inboundCounts, unsigned int* priorities, int n) {
 	uint idx = blockIdx.x * blockDim.x + threadIdx.x;
 	if (idx >= n)
@@ -414,8 +414,6 @@ __global__ void colorWithInboundCounters(Coloring* coloring, GraphStruct* graphS
 	{
 		buffer[idx] = coloring->numOfColors;
 		filledBuffer[idx] = true;
-
-		
 	}
 	else
 	{
@@ -599,7 +597,7 @@ Coloring* RandomPriorityColoringV3(Graph& graph) // V2 + bitmaps
 	dim3 blockDim(THREADxBLOCK);
 	dim3 gridDim((n + blockDim.x - 1) / blockDim.x, 1, 1);
 	uint seed = 0;
-	InitRandomPriorities << <gridDim, blockDim >> > (seed, states, priorities, n);
+	InitRandomPriorities <<<gridDim, blockDim >> > (seed, states, priorities, n);
 	cudaDeviceSynchronize();
 
 	// Calculate inbound counters
@@ -608,6 +606,20 @@ Coloring* RandomPriorityColoringV3(Graph& graph) // V2 + bitmaps
 	cudaMemset(inboundCounts, 0, n * sizeof(uint));
 	calculateInbounds << <gridDim, blockDim >> > (graphStruct, inboundCounts, priorities, n);
 	cudaDeviceSynchronize();
+
+	// inizialize bitmaps, every node has a bitmap with a length of inbound edges + 1 TODO: aloc on gpu
+	// vision: allocare tutto in un array come al solito ma serve la prefix sum
+	// alternativa1: sequenziale O(n)
+	// alternativa2: le bitmap vengono allocate staticamente nel kernel, basterebbe poi costruire un index, non sono sequenziali ma penso sia ok
+	bool* bitmaps;
+	uint bitCount = (n + (int)(graphStruct->edgeCount + 1) / 2);
+	CHECK(cudaMallocManaged(&(bitmaps), bitCount * sizeof(bool)));
+	memset(bitmaps, 1, bitCount * sizeof(bool));
+	uint* bitmapIndex;
+	CHECK(cudaMallocManaged(&bitmapIndex, (n + 1) * sizeof(uint)));
+	bitmapIndex[0] = 0;
+	for (int i = 1; i < m_GraphStruct->nodeCount + 1; i++)
+		bitmapIndex[i] = bitmapIndex[i - 1] + m_InboundCounts[i - 1] + 1; //this info should be taken by the dag and the inbound should be only in gpu mem
 
 	// Alloc buffer needed to synchronize the coloring
 	unsigned* buffer;
