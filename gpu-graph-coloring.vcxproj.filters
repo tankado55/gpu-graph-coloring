@@ -21,6 +21,7 @@
     <CudaCompile Include="src\graph\graph.cu">
       <Filter>Source Files</Filter>
     </CudaCompile>
+    <CudaCompile Include="src\OldColorer.cu" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Colorer.h">

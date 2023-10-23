@@ -2,6 +2,9 @@
 #include <cstring>
 #include <iostream>
 #include <memory>
+#include <fstream>
+#include <string>
+#include <set>
 
 #include "graph.h"
 #include "../utils/common.h"
@@ -20,6 +23,18 @@ Graph::Graph(MemoryEnum mem) {
 	Init();
 }
 
+Graph::~Graph()
+{
+	if (memoryEnum == ManagedAllocated)
+	{
+		FreeManaged();
+	}
+	else
+	{
+		delete graphStruct;
+	}
+}
+
 void Graph::Init() {
 	if (memoryEnum == ManagedAllocated)
 	{
@@ -29,8 +44,91 @@ void Graph::Init() {
 	{
 		graphStruct = new GraphStruct();
 	}
-	graphStruct->nodeCount = graphStruct->edgeCount = graphStruct->maxDeg = 0;
+	graphStruct->nodeCount = graphStruct->edgeCount = 0;
 	graphStruct->neighIndex = graphStruct->neighs = NULL;
+}
+
+void Graph::ReadFromMtxFile(const char* mtx) {
+	printf("Reading .mtx input file %s\n", mtx);
+	std::ifstream cfile;
+	cfile.open(mtx);
+	std::string str;
+	getline(cfile, str);
+	char c;
+	sscanf(str.c_str(), "%c", &c);
+	while (c == '%') {
+		getline(cfile, str);
+		sscanf(str.c_str(), "%c", &c);
+	}
+	int n;
+	sscanf(str.c_str(), "%d %d %d", &graphStruct->nodeCount, &n, &graphStruct->edgeCount);
+	if (graphStruct->nodeCount != n) {
+		printf("error!\n");
+		exit(0);
+	}
+	printf("num_vertices %d, num_edges %d\n", graphStruct->nodeCount, graphStruct->edgeCount);
+	vector<set<int> > svector;
+	set<int> s;
+	for (int i = 0; i < graphStruct->nodeCount; i++)
+		svector.push_back(s);
+	int dst, src;
+	for (int i = 0; i < graphStruct->edgeCount; i++) {
+		getline(cfile, str);
+		sscanf(str.c_str(), "%d %d", &dst, &src);
+
+		dst--;
+		src--;
+
+		svector[src].insert(dst);
+		svector[dst].insert(src);
+	}
+	cfile.close();
+	graphStruct->neighIndex = (uint*)malloc((graphStruct->nodeCount + 1) * sizeof(int));
+	int count = 0;
+	for (int i = 0; i < graphStruct->nodeCount; i++) {
+		graphStruct->neighIndex[i] = count;
+		count += svector[i].size();
+	}
+	graphStruct->neighIndex[graphStruct->nodeCount] = count;
+	if (count != graphStruct->edgeCount) {
+		printf("The graph is not symmetric\n");
+		graphStruct->edgeCount = count;
+	}
+	double avgdeg;
+	double variance = 0.0;
+	int maxdeg = 0;
+	int mindeg = graphStruct->nodeCount;
+	avgdeg = (double)graphStruct->edgeCount / graphStruct->nodeCount;
+	for (int i = 0; i < graphStruct->nodeCount; i++) {
+		int deg_i = graphStruct->neighIndex[i + 1] - graphStruct->neighIndex[i];
+		if (deg_i > maxdeg)
+			maxdeg = deg_i;
+		if (deg_i < mindeg)
+			mindeg = deg_i;
+		variance += (deg_i - avgdeg) * (deg_i - avgdeg) / graphStruct->nodeCount;
+	}
+	printf("mindeg %d maxdeg %d avgdeg %.2f variance %.2f\n", mindeg, maxdeg, avgdeg, variance);
+	graphStruct->neighs = (uint*)malloc(count * sizeof(int));
+	set<int>::iterator site;
+	for (int i = 0, index = 0; i < graphStruct->nodeCount; i++) {
+		site = svector[i].begin();
+		while (site != svector[i].end()) {
+			graphStruct->neighs[index++] = *site;
+			site++;
+		}
+	}
+}
+
+void Graph::copyToDevice(GraphStruct*& dest)
+{
+	CHECK(cudaMalloc((void**)dest, sizeof(GraphStruct)));
+	CHECK(cudaMemcpy(&dest->nodeCount, &graphStruct->nodeCount, sizeof(int), cudaMemcpyHostToDevice));
+	CHECK(cudaMemcpy(&dest->edgeCount, &graphStruct->edgeCount, sizeof(int), cudaMemcpyHostToDevice));
+
+	CHECK(cudaMalloc((void**)dest->neighIndex, (graphStruct->nodeCount + 1) * sizeof(uint)));
+	CHECK(cudaMalloc((void**)dest->neighs, graphStruct->edgeCount * sizeof(uint)));
+	CHECK(cudaMemcpy(dest->neighIndex, graphStruct->neighIndex, (graphStruct->nodeCount + 1) * sizeof(uint), cudaMemcpyHostToDevice));
+	CHECK(cudaMemcpy(dest->neighs, graphStruct->neighs, graphStruct->edgeCount * sizeof(uint), cudaMemcpyHostToDevice));
 }
 
 void Graph::randGraph(float prob, std::default_random_engine & eng, unsigned n) {
@@ -85,7 +183,6 @@ void Graph::randGraph(float prob, std::default_random_engine & eng, unsigned n) 
 		if (graphStruct->deg(i) > maxDeg)
 		{
 			maxDeg = graphStruct->deg(i);
-			graphStruct->maxDeg = maxDeg;
 		}
 		if (graphStruct->deg(i) < minDeg)
 			minDeg = graphStruct->deg(i);
@@ -223,7 +320,8 @@ void Graph::AllocDagOnDevice(GraphStruct* dag)
  * Print the graph (verbose = 1 for "verbose print")
  * @param verbose print the complete graph
  */
-void Graph::print(bool verbose) {
+void Graph::print(bool verbose)
+{
 	unsigned n = graphStruct->nodeCount;
 	cout << "** Graph (num node: " << n << ", num edges: " << graphStruct->edgeCount
 			<< ")" << endl;
@@ -241,17 +339,5 @@ void Graph::print(bool verbose) {
 			cout << "\n";
 		}
 		cout << "\n";
-	}
-}
-
-Graph::~Graph()
-{
-	if (memoryEnum == ManagedAllocated)
-	{
-		FreeManaged();
-	}
-	else
-	{
-		delete graphStruct;
 	}
 }

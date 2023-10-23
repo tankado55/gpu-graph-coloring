@@ -8,7 +8,7 @@
 
 struct Coloring {
 	bool uncoloredFlag;
-	uint numOfColors;
+	uint iterationCount;
 	uint* coloring;   // each element denotes the color of the node at the correspondent index
 	bool* coloredNodes;
 };
@@ -45,5 +45,5 @@ void printColoring(Coloring*, GraphStruct*, bool);
 __global__ void InitRandomPriorities(uint seed, curandState_t*, uint*, uint);
 __global__ void findIS(Coloring*, GraphStruct*, uint*);
 __global__ void print_d(GraphStruct*, bool);
-__global__ void applyBufferWithInboundCountersBitmaps(Coloring*, GraphStruct*, unsigned*, unsigned*, unsigned*, bool*, bool*, uint*);
-__global__ void colorWithInboundCountersBitmaps(Coloring*, GraphStruct*, uint*, uint*, bool*, bool*, uint*);
+__global__ void applyBufferWithInboundCountersBitmaps(uint*, bool*, GraphStruct*, unsigned*, unsigned*, unsigned*, bool*, bool*, uint*);
+__global__ void colorWithInboundCountersBitmaps(uint*, bool*, GraphStruct*, uint*, uint*, bool*, bool*, uint*, bool*);

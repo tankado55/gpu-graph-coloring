@@ -136,6 +136,10 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <CudaCompile Include="src\Colorer.cu" />
+    <CudaCompile Include="src\OldColorer.cu">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </CudaCompile>
     <CudaCompile Include="src\main.cu" />
     <CudaCompile Include="src\graph\graph_d.cu" />
   </ItemGroup>

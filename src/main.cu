@@ -6,12 +6,15 @@
 #include <iostream>
 
 int main(void) {
-	unsigned int n = 20000;		 // number of nodes for random graphs 16k 5.117.258 17k 5.777.572
-	float prob = .02;				    // density (percentage) for random graphs
+	unsigned int n = 10000;		 // 80k ok 115 mln edge
+	float prob = .018;				    // density (percentage) for random graphs
 	std::default_random_engine engine{ 0 };  // fixed seed
 
 	// new graph with n nodes
 	Graph graph(Graph::MemoryEnum::ManagedAllocated);
+	//graph.ReadFromMtxFile("inputData/kron_g500-logn21.mtx");
+	//GraphStruct* d_GraphStruct;
+	//graph.copyToDevice(d_GraphStruct);
 
 	// generate a random graph
 	graph.randGraph(prob, engine, n);
@@ -21,7 +24,6 @@ int main(void) {
 
 	printf("start, edgeCount: %d\n", graphStruct->edgeCount);
 	printf("start, nodeCount: %d\n", graphStruct->nodeCount);
-	printf("start, maxDeg: %d\n", graphStruct->maxDeg);
 
 	// print small graph
 	if (n <= 128) {
@@ -29,26 +31,6 @@ int main(void) {
 		print_d <<<1, 1 >>> (graphStruct, true);  // GPU print
 		cudaDeviceSynchronize();
 	}
-
-	///////////////////DEBUG
-	//uint offset = graphStruct->neighIndex[6277];
-	//uint deg = graphStruct->neighIndex[6277 + 1] - graphStruct->neighIndex[6277];
-	
-	//printf("node: %d, deg %d: , index: %d,%d\n", 6277, deg, graphStruct->neighIndex[6277], graphStruct->neighIndex[6277 + 1]);
-	//for (int i = 0; i < deg; ++i)
-	//{
-	//	printf("neigh: %d\n", graphStruct->neighs[offset + i]);
-	//}
-	
-
-	//offset = graphStruct->neighIndex[9985];
-	//deg = graphStruct->neighIndex[9985 + 1] - graphStruct->neighIndex[9985];
-
-	//printf("node: %d, deg: %d\n", 9985, deg);
-	//for (int i = 0; i < deg; ++i)
-	//{
-	//	printf("neigh: %d\n", graphStruct->neighs[offset + i]);
-	//}
 
 	//-------------- START TIME ----------------//
 	double start = seconds();
@@ -65,7 +47,7 @@ int main(void) {
 	//-------------- END TIME ----------------//
 
 	//printColoring(coloring, graphStruct, 1);
-	std::cout << coloring->numOfColors << std::endl;
+	std::cout << "Iterations: " << coloring->iterationCount << std::endl;
 
 	std::cout << elapsedTime(start, stop) << std::endl;
 

@@ -11,7 +11,6 @@ struct GraphStruct {
 	unsigned edgeCount{0};             // num of graph edges
 	unsigned* neighIndex{nullptr};       // cumsum of node degrees
 	unsigned* neighs{nullptr};           // list of neighbors for all nodes (edges)
-	unsigned int maxDeg;
 		
 	~GraphStruct() {delete[] neighs; delete[] neighIndex;}
 
@@ -48,6 +47,8 @@ public:
 	Graph(MemoryEnum);
 	~Graph();
 	void Init(); // CPU/GPU mem setup
+	void ReadFromMtxFile(const char* mtx);
+	void copyToDevice(GraphStruct*& dest);
 	void randGraph(float, std::default_random_engine&, unsigned);  // generate an Erdos random graph
 	void BuildRandomDAG(Graph&);
 	void print(bool);
