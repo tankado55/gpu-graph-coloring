@@ -62,6 +62,7 @@ void Graph::ReadFromMtxFile(const char* mtx) {
 	}
 	int n;
 	sscanf(str.c_str(), "%d %d %d", &graphStruct->nodeCount, &n, &graphStruct->edgeCount);
+	graphStruct->edgeCount *= 2;
 	if (graphStruct->nodeCount != n) {
 		printf("error!\n");
 		exit(0);
@@ -72,11 +73,11 @@ void Graph::ReadFromMtxFile(const char* mtx) {
 	for (int i = 0; i < graphStruct->nodeCount; i++)
 		svector.push_back(s);
 	int dst, src;
-	for (int i = 0; i < graphStruct->edgeCount; i++) {
+	for (int i = 0; i < graphStruct->edgeCount/2; i++) {
 		getline(cfile, str);
 		sscanf(str.c_str(), "%d %d", &dst, &src);
 
-		dst--;
+		dst--;// -1 because the dataset begins with node id = 1
 		src--;
 
 		svector[src].insert(dst);
@@ -108,7 +109,7 @@ void Graph::ReadFromMtxFile(const char* mtx) {
 		variance += (deg_i - avgdeg) * (deg_i - avgdeg) / graphStruct->nodeCount;
 	}
 	printf("mindeg %d maxdeg %d avgdeg %.2f variance %.2f\n", mindeg, maxdeg, avgdeg, variance);
-	graphStruct->neighs = (uint*)malloc(count * sizeof(int));
+	graphStruct->neighs = (uint*)malloc(graphStruct->edgeCount * sizeof(int));
 	set<int>::iterator site;
 	for (int i = 0, index = 0; i < graphStruct->nodeCount; i++) {
 		site = svector[i].begin();
@@ -121,14 +122,18 @@ void Graph::ReadFromMtxFile(const char* mtx) {
 
 void Graph::copyToDevice(GraphStruct*& dest)
 {
-	CHECK(cudaMalloc((void**)dest, sizeof(GraphStruct)));
+	CHECK(cudaMalloc((void**)&dest, sizeof(GraphStruct)));
 	CHECK(cudaMemcpy(&dest->nodeCount, &graphStruct->nodeCount, sizeof(int), cudaMemcpyHostToDevice));
 	CHECK(cudaMemcpy(&dest->edgeCount, &graphStruct->edgeCount, sizeof(int), cudaMemcpyHostToDevice));
 
-	CHECK(cudaMalloc((void**)dest->neighIndex, (graphStruct->nodeCount + 1) * sizeof(uint)));
-	CHECK(cudaMalloc((void**)dest->neighs, graphStruct->edgeCount * sizeof(uint)));
-	CHECK(cudaMemcpy(dest->neighIndex, graphStruct->neighIndex, (graphStruct->nodeCount + 1) * sizeof(uint), cudaMemcpyHostToDevice));
-	CHECK(cudaMemcpy(dest->neighs, graphStruct->neighs, graphStruct->edgeCount * sizeof(uint), cudaMemcpyHostToDevice));
+	uint* neighIndexTemp;
+	uint* neighsTemp;
+	CHECK(cudaMalloc((void**)&neighIndexTemp, (graphStruct->nodeCount + 1) * sizeof(uint)));
+	CHECK(cudaMalloc((void**)&neighsTemp, graphStruct->edgeCount * sizeof(uint)));
+	CHECK(cudaMemcpy(&(dest->neighIndex), &(neighIndexTemp), sizeof(uint*), cudaMemcpyHostToDevice));
+	CHECK(cudaMemcpy(&(dest->neighs), &(neighsTemp), sizeof(uint*), cudaMemcpyHostToDevice));
+	CHECK(cudaMemcpy(neighIndexTemp, graphStruct->neighIndex, (graphStruct->nodeCount + 1) * sizeof(uint), cudaMemcpyHostToDevice));
+	CHECK(cudaMemcpy(neighsTemp, graphStruct->neighs, graphStruct->edgeCount * sizeof(uint), cudaMemcpyHostToDevice));
 }
 
 void Graph::randGraph(float prob, std::default_random_engine & eng, unsigned n) {

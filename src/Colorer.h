@@ -40,7 +40,7 @@ Coloring* RandomPriorityColoring(Graph& graph);
 void test(Graph& graph);
 Coloring* RandomPriorityColoringV2(Graph& graph);
 Coloring* RandomPriorityColoringV3(Graph& graph);
-Coloring* LDFColoringV3(Graph& graph);
+Coloring* LDFColoringV3(GraphStruct*, int, int);
 void printColoring(Coloring*, GraphStruct*, bool);
 __global__ void InitRandomPriorities(uint seed, curandState_t*, uint*, uint);
 __global__ void findIS(Coloring*, GraphStruct*, uint*);

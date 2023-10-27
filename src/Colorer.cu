@@ -32,51 +32,6 @@ Colorer::~Colorer(){
 	cudaFree(m_InboundCounts);
 }
 
-__global__ void initLDF(GraphStruct* graphStruct, int* inboundCounts, int n) {
-	uint idx = blockIdx.x * blockDim.x + threadIdx.x;
-	if (idx >= n)
-		return;
-
-	uint degree = graphStruct->neighIndex[idx + 1] - graphStruct->neighIndex[idx];
-	printf("node(%d [myDegree: %d] \n", idx, degree);
-
-	inboundCounts[idx] = 0;
-	for (uint i = 0; i < degree; ++i)
-	{
-		uint neighID = graphStruct->neighs[graphStruct->neighIndex[idx] + i];
-		uint neighDegree = graphStruct->neighIndex[neighID + 1] - graphStruct->neighIndex[neighID]; // ottimizzabile su CPU
-		if (degree > neighDegree)
-		{
-			atomicAdd(&inboundCounts[neighID], 1);
-			printf(" atomicAdd node(%d -> %d [count: %d] \n", idx, neighID, inboundCounts[neighID]);
-		}
-		else if (degree == neighDegree && idx > neighID)
-		{
-			atomicAdd(&inboundCounts[neighID], 1);
-			printf(" atomicAdd node(%d -> %d [count: %d] \n", idx, neighID, inboundCounts[neighID]);
-		}
-	}
-}
-
-__global__ void initLDF2(GraphStruct* graphStruct, uint* inboundCounts, int n) {
-	uint idx = blockIdx.x * blockDim.x + threadIdx.x;
-	if (idx >= n)
-		return;
-
-	uint degree = graphStruct->neighIndex[idx + 1] - graphStruct->neighIndex[idx];
-	//printf("node(%d [myDegree: %d] \n", idx, degree);
-
-	inboundCounts[idx] = 0;
-	for (uint i = 0; i < degree; ++i) //TODO: ciclo inutile, basta mettere piú 1 a ogni elemento della lista
-	{
-		uint neighID = graphStruct->neighs[graphStruct->neighIndex[idx] + i];
-		
-		atomicAdd(&inboundCounts[neighID], 1);
-		//printf(" atomicAdd node(%d -> %d [count: %d] \n", idx, neighID, inboundCounts[neighID]);
-		
-	}
-}
-
 __global__ void findISLDF(Coloring* coloring, GraphStruct* graphStruct, bool* bitmaps, uint* bitmapIndex, uint* inboundCounts)
 {
 	uint idx = threadIdx.x + blockDim.x * blockIdx.x;
@@ -123,64 +78,6 @@ __global__ void findISLDF(Coloring* coloring, GraphStruct* graphStruct, bool* bi
 	{
 		coloring->uncoloredFlag = true;
 	}
-}
-
-
-
-Coloring* Colorer::LDFColoring()
-{
-	dim3 blockDim(THREADxBLOCK);
-	dim3 gridDim((m_GraphStruct->nodeCount + blockDim.x - 1) / blockDim.x, 1, 1);
-	
-	// Init DAG TODO: refactorare
-	GraphStruct* dag;
-	CHECK(cudaMallocManaged(&dag, sizeof(GraphStruct)));
-	CHECK(cudaMallocManaged(&(dag->neighIndex), (m_GraphStruct->nodeCount + 1) * sizeof(int)));
-	CHECK(cudaMallocManaged(&(dag->neighs), (m_GraphStruct->edgeCount+1)/2 * sizeof(int)));
-	m_Graph->getLDFDag(dag);
-
-	//initLDF <<<gridDim, blockDim>>> (m_GraphStruct, m_InboundCounts, m_GraphStruct->nodeCount);
-	initLDF2 <<<gridDim, blockDim>>> (dag, m_InboundCounts, m_GraphStruct->nodeCount);
-	cudaDeviceSynchronize();
-
-	// inizialize bitmaps
-	// Every node has a bitmap with a length of inbound edges + 1
-	bool* bitmaps;
-	uint bitCount = (m_GraphStruct->nodeCount + (int)(m_GraphStruct->edgeCount + 1) / 2);
-	CHECK(cudaMallocManaged(&(bitmaps), bitCount * sizeof(bool)));
-	memset(bitmaps, 1, bitCount * sizeof(bool));
-	uint* bitmapIndex;
-	CHECK(cudaMallocManaged(&bitmapIndex, (m_GraphStruct->nodeCount + 1) * sizeof(uint)));
-	cudaDeviceSynchronize();
-	bitmapIndex[0] = 0;
-	for (int i = 1; i < m_GraphStruct->nodeCount + 1; i++)
-		bitmapIndex[i] = bitmapIndex[i - 1] + m_InboundCounts[i - 1] + 1; //this info should be taken by the dag and the inbound should be only in gpu mem
-
-	uint iterationCount = 0;
-	while (m_Coloring->uncoloredFlag) {
-		m_Coloring->uncoloredFlag = false;
-		iterationCount++;
-		printf("------------ Sequential iteration: %d \n", iterationCount);
-		int deb_inBoundSum = 0;
-		for (int i = 0; i < m_GraphStruct->nodeCount; ++i)
-		{
-			deb_inBoundSum += m_InboundCounts[i];
-		}
-		printf("------------ inboundsum: %d \n", deb_inBoundSum);
-		printf("edges: %d", m_GraphStruct->edgeCount);
-		int deb_ready = 0;
-		for (int i = 0; i < m_GraphStruct->nodeCount; ++i)
-		{
-			if (m_InboundCounts[i] == 0 && m_Coloring->coloredNodes[i] == false)
-				++deb_ready;
-		}
-		if (deb_ready == 0)
-			printf("------------ ready: %d \n", deb_ready);
-		findISLDF <<< gridDim, blockDim >>> (m_Coloring, dag, bitmaps, bitmapIndex, m_InboundCounts);
-		cudaDeviceSynchronize();
-	}
-
-	return m_Coloring;
 }
 
 Coloring* Colorer::RandomPriorityColoringCPUSequential()
@@ -262,7 +159,7 @@ void mallocOnHost(Coloring* coloring, unsigned n)
 }
 
 //TODO: evita atomic add facendo il confronto al contrario
-__global__ void calculateInbounds(GraphStruct* graphStruct, unsigned int* inboundCounts, unsigned int* priorities, int n) {
+__global__ void calculateInbounds(GraphStruct* graphStruct, unsigned int* inboundCounts, unsigned int* priorities, int n, unsigned int* outboundCounts) {
 	uint idx = blockIdx.x * blockDim.x + threadIdx.x;
 	if (idx >= n)
 		return;
@@ -270,31 +167,25 @@ __global__ void calculateInbounds(GraphStruct* graphStruct, unsigned int* inboun
 	uint degree = graphStruct->neighIndex[idx + 1] - graphStruct->neighIndex[idx];
 	//printf("node(%d [myDegree: %d] \n", idx, degree);
 
-	inboundCounts[idx] = 0;
+	//inboundCounts[idx] = 0;
 	for (uint i = 0; i < degree; ++i)
 	{
 		uint neighID = graphStruct->neighs[graphStruct->neighIndex[idx] + i];
 		if (priorities[idx] > priorities[neighID])
 		{
 			atomicAdd(&inboundCounts[neighID], 1);
+			atomicAdd(&outboundCounts[idx], 1);
 			//printf(" atomicAdd node(%d -> %d [count: %d] \n", idx, neighID, inboundCounts[neighID]);
 		}
 		else if (priorities[idx] == priorities[neighID] && idx > neighID)
 		{
 			atomicAdd(&inboundCounts[neighID], 1);
+			atomicAdd(&outboundCounts[idx], 1);
 			//printf(" atomicAdd node(%d -> %d [count: %d] \n", idx, neighID, inboundCounts[neighID]);
 		}
 	}
 }
 
-
-
-
-
-__global__ void buildParallelDag()
-{
-
-}
 
 
 
@@ -521,10 +412,9 @@ Coloring* RandomPriorityColoring(Graph& graph) // no inboundsCount, no bitmap no
 
 
 
-Coloring* LDFColoringV3(Graph& graph)
+Coloring* LDFColoringV3(GraphStruct* graphStruct, int n, int edgeCount)
 {
 	// Alloc and Init returning struct
-	int n = graph.getStruct()->nodeCount;
 	uint* coloring = (uint*) malloc(n * sizeof(uint));
 	bool* coloredNodes = (bool*) malloc(n * sizeof(bool));
 	memset(coloring, 0, n * sizeof(uint));
@@ -535,7 +425,6 @@ Coloring* LDFColoringV3(Graph& graph)
 	CHECK(cudaMalloc((void**)&(d_coloredNodes), n * sizeof(bool)));
 	cudaMemcpy(d_coloring,coloring, n * sizeof(uint), cudaMemcpyHostToDevice);
 	cudaMemcpy(d_coloredNodes, coloredNodes, n * sizeof(bool), cudaMemcpyHostToDevice);
-	GraphStruct* graphStruct = graph.getStruct();
 
 	// Generate LDF priorities
 	uint* priorities;
@@ -547,9 +436,12 @@ Coloring* LDFColoringV3(Graph& graph)
 
 	// Calculate inbound counters
 	uint* inboundCounts;
+	uint* outboundCounts;
 	CHECK(cudaMalloc((void**)&inboundCounts, n * sizeof(uint)));
+	CHECK(cudaMalloc((void**)&outboundCounts, n * sizeof(uint)));
 	cudaMemset(inboundCounts, 0, n * sizeof(uint));
-	calculateInbounds << <gridDim, blockDim >> > (graphStruct, inboundCounts, priorities, n);
+	cudaMemset(outboundCounts, 0, n * sizeof(uint));
+	calculateInbounds << <gridDim, blockDim >> > (graphStruct, inboundCounts, priorities, n, outboundCounts);
 	cudaDeviceSynchronize();
 
 	// inizialize bitmaps, every node has a bitmap with a length of inbound edges + 1 TODO: alloc on gpu
@@ -557,15 +449,15 @@ Coloring* LDFColoringV3(Graph& graph)
 	// alternativa1: sequenziale O(n)
 	// alternativa2: le bitmap vengono allocate staticamente nel kernel, basterebbe poi costruire un index, non sono sequenziali ma penso sia ok
 	bool* bitmaps;
-	uint bitCount = (n + (int)(graphStruct->edgeCount + 1) / 2);
+	uint bitCount = (n + (int)(edgeCount + 1) / 2);
 	CHECK(cudaMallocManaged(&(bitmaps), bitCount * sizeof(bool)));
 	memset(bitmaps, 1, bitCount * sizeof(bool));
 	uint* bitmapIndex;
 	CHECK(cudaMallocManaged(&bitmapIndex, (n + 1) * sizeof(uint)));
-	bitmapIndex[0] = 0;
 	uint* h_InboundCounts;
 	h_InboundCounts = (uint*)malloc(n * sizeof(uint));
 	cudaMemcpy(h_InboundCounts, inboundCounts, n * sizeof(uint), cudaMemcpyDeviceToHost);
+	bitmapIndex[0] = 0;
 	for (int i = 1; i < n + 1; i++)
 		bitmapIndex[i] = bitmapIndex[i - 1] + h_InboundCounts[i - 1] + 1; //the inbound should be only in gpu mem TODO: parallelize with scan
 
@@ -579,6 +471,7 @@ Coloring* LDFColoringV3(Graph& graph)
 
 	// DEBUG
 	uint* h_priorities = (uint*)malloc(n * sizeof(uint));
+	//cudaMemcpy(h_priorities, priorities, n * sizeof(uint), cudaMemcpyDeviceToHost);
 
 	// Color TODO: tieni il flag sulla gpu e itera con gli stream
 	int iterationCount = 0;
@@ -615,6 +508,7 @@ Coloring* LDFColoringV3(Graph& graph)
 	Coloring* coloringStruct = (Coloring*) malloc(sizeof(Coloring));
 	coloringStruct->coloring = coloring;
 	coloringStruct->coloredNodes = coloredNodes;
+	coloringStruct->iterationCount = iterationCount;
 	return coloringStruct;
 }
 
@@ -635,7 +529,8 @@ __global__ void colorWithInboundCountersBitmaps(uint* coloring, bool* coloredNod
 	if (inboundCounts[idx] == 0) // Ready node
 	{
 		int colorCount = bitmapIndex[idx + 1] - bitmapIndex[idx];
-		//printf("I'm %d, total colors: %d\n", idx, colorCount);
+		if (idx == 18836)
+			printf("I'm %d, total colors: %d\n", idx, colorCount);
 
 		int bestColor = colorCount;
 		for (int i = 0; i < colorCount; ++i)
@@ -643,6 +538,8 @@ __global__ void colorWithInboundCountersBitmaps(uint* coloring, bool* coloredNod
 			if (bitmaps[bitmapIndex[idx] + i])
 			{
 				bestColor = i;
+				if (idx == 18836)
+					printf("I'm: %d, ---------best color: %d\n", idx, bestColor);
 				break;
 			}
 		}
@@ -653,7 +550,10 @@ __global__ void colorWithInboundCountersBitmaps(uint* coloring, bool* coloredNod
 	else
 	{
 		*uncoloredFlag = true;
-		//printf("GPU - I'm %d, test: %d\n", idx, *uncoloredFlag);
+		//if (idx == 0)
+		//{
+		//	printf("GPU - I'm %d, flag true, still: %d\n", idx, inboundCounts[idx]);
+		//}
 	}
 }
 
@@ -680,25 +580,40 @@ __global__ void applyBufferWithInboundCountersBitmaps(uint* coloring, bool* colo
 		if (priorities[idx] > priorities[neighID])
 		{
 			atomicAdd(&inboundCounts[neighID], -1);
-			bitmaps[bitmapIndex[neighID] + buffer[idx]] = 0;
+			int colorCount = bitmapIndex[neighID + 1] - bitmapIndex[neighID];
+			if (buffer[idx] < colorCount)
+				bitmaps[bitmapIndex[neighID] + buffer[idx]] = 0;
 
-			//if (neighID == 8984)
-			//	printf("I'm: %d, removed arc to: %d: \n", idx, neighID);
+			if (neighID == 18836) {
+				printf("I'm: %d, ---------removed arc to: %d, still: %d\n", idx, neighID, inboundCounts[neighID]);
+				printf("%d, %d, %d, %d, %d\n", bitmaps[bitmapIndex[neighID] + 0], bitmaps[bitmapIndex[neighID] + 1], bitmaps[bitmapIndex[neighID] + 2], bitmaps[bitmapIndex[neighID] + 3], bitmaps[bitmapIndex[neighID] + 4]);
+			}
 		}
 		else if (priorities[idx] == priorities[neighID] && idx > neighID)
 		{
 			atomicAdd(&inboundCounts[neighID], -1);
-			bitmaps[bitmapIndex[neighID] + buffer[idx]] = 0;
+			int colorCount = bitmapIndex[neighID + 1] - bitmapIndex[neighID];
+			if (buffer[idx] < colorCount)
+				bitmaps[bitmapIndex[neighID] + buffer[idx]] = 0;
 
-			//if (neighID == 8984)
-			//	printf("I'm: %d, removed arc to: %d: \n", idx, neighID);
+			if (neighID == 18836) {
+				printf("I'm: %d, ---------removed arc to: %d, still: %d\n", idx, neighID, inboundCounts[neighID]);
+				printf("%d, %d, %d, %d, %d\n", bitmaps[bitmapIndex[neighID] + 0], bitmaps[bitmapIndex[neighID] + 1], bitmaps[bitmapIndex[neighID] + 2], bitmaps[bitmapIndex[neighID] + 3], bitmaps[bitmapIndex[neighID] + 4]);
+			}
 		}
-
+		else {
+			//if (neighID == 3)
+			//	printf("I'm: %d, ---------NOT removed arc to: %d, still: %d\n", idx, neighID, inboundCounts[neighID]);
+		}
+		
 	}
+	if (idx == 18836)
+		printf("I'm: %d, colored: %d \n", idx, buffer[idx]);
+
 	coloring[idx] = buffer[idx];
 	coloredNodes[idx] = true;
 	filledBuffer[idx] = false;
-	//printf("buffer applied: %d, color: %d\n", idx, coloring->coloring[idx]);
+	//printf("buffer applied: from %d, color: %d\n", idx, coloring[idx]);
 }
 
 __global__ void testAtomicAdd(GraphStruct* graphStruct, unsigned* priorities, unsigned* inboundCounts)
@@ -735,42 +650,7 @@ __global__ void testAtomicAdd(GraphStruct* graphStruct, unsigned* priorities, un
 
 }
 
-void test(Graph& graph)
-{
-	GraphStruct* graphStruct = graph.getStruct();
-	int n = graphStruct->nodeCount;
-	uint* h_InboundCounts;
-	h_InboundCounts = (uint*)malloc(n * sizeof(uint));
 
-	//priorities
-	uint* priorities;
-	cudaMalloc((void**)&priorities, n * sizeof(uint));
-	dim3 blockDim(THREADxBLOCK);
-	dim3 gridDim((n + blockDim.x - 1) / blockDim.x, 1, 1);
-	InitLDFPriorities << <gridDim, blockDim >> > (graphStruct, priorities, n);
-	cudaDeviceSynchronize();
-
-	//inbounds
-	uint* inboundCounts;
-	CHECK(cudaMalloc((void**)&inboundCounts, n * sizeof(uint)));
-	cudaMemset(inboundCounts, 0, n * sizeof(uint));
-	calculateInbounds << <gridDim, blockDim >> > (graphStruct, inboundCounts, priorities, n);
-	cudaDeviceSynchronize();
-
-	cudaMemcpy(h_InboundCounts, inboundCounts, n * sizeof(uint), cudaMemcpyDeviceToHost);
-
-	testAtomicAdd << <gridDim, blockDim >> > (graphStruct, priorities, inboundCounts);
-	cudaDeviceSynchronize();
-
-	
-	cudaMemcpy(h_InboundCounts, inboundCounts, n * sizeof(uint), cudaMemcpyDeviceToHost);
-	for (int i = 0; i < n; ++i)
-	{
-		if (h_InboundCounts[0] != 0)
-			std::cout << "error" << std::endl;
-	}
-	std::cout << "end" << std::endl;
-}
 
 
 

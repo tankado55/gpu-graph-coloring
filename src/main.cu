@@ -6,18 +6,18 @@
 #include <iostream>
 
 int main(void) {
-	unsigned int n = 10000;		 // 80k ok 115 mln edge
+	unsigned int n = 20000;		 // 80k ok 115 mln edge
 	float prob = .018;				    // density (percentage) for random graphs
 	std::default_random_engine engine{ 0 };  // fixed seed
 
 	// new graph with n nodes
-	Graph graph(Graph::MemoryEnum::ManagedAllocated);
-	//graph.ReadFromMtxFile("inputData/kron_g500-logn21.mtx");
-	//GraphStruct* d_GraphStruct;
-	//graph.copyToDevice(d_GraphStruct);
+	Graph graph(Graph::MemoryEnum::HostAllocated);
+	graph.ReadFromMtxFile("inputData/soc-youtube-snap/soc-youtube-snap.mtx");
+	GraphStruct* d_GraphStruct;
+	graph.copyToDevice(d_GraphStruct);
 
 	// generate a random graph
-	graph.randGraph(prob, engine, n);
+	//graph.randGraph(prob, engine, n);
 
 	// get the graph struct
 	GraphStruct* graphStruct = graph.getStruct();
@@ -40,7 +40,7 @@ int main(void) {
 	//Coloring* coloring = RandomPriorityColoring(graph);     // 0.375 20k 1.509 no inbound
 	//Coloring* coloring = RandomPriorityColoringV2(graph); // 0.352     20k 1.424 con inbounds 0.97 msi
 	//Coloring* coloring = RandomPriorityColoringV3(graph); //                                0.96 72 colors
-	Coloring* coloring = LDFColoringV3(graph);              //                                     70 colors
+	Coloring* coloring = LDFColoringV3(d_GraphStruct, graphStruct->nodeCount, graphStruct->edgeCount);              // bitmaps 20k 0.018 1.029sec/0.914sec
 	//test(graph);
 
 	double stop = seconds();
