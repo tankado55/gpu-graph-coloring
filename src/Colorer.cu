@@ -410,7 +410,16 @@ Coloring* RandomPriorityColoring(Graph& graph) // no inboundsCount, no bitmap no
 	return coloring;
 }
 
-
+uint* calculateSDFPriorities(const GraphStruct* graphStruct, int n)
+{
+	uint* priorities;
+	cudaMalloc((void**)&priorities, n * sizeof(uint));
+	dim3 blockDim(THREADxBLOCK);
+	dim3 gridDim((n + blockDim.x - 1) / blockDim.x, 1, 1);
+	InitLDFPriorities <<<gridDim, blockDim >>> (graphStruct, priorities, n);
+	cudaDeviceSynchronize();
+	return priorities;
+}
 
 Coloring* LDFColoringV3(GraphStruct* graphStruct, int n, int edgeCount)
 {
