@@ -437,10 +437,18 @@ uint* calculateDegreePriority(GraphStruct* graphStruct, priorityEnum priorityEnu
 	return d_priorities;
 }
 
-Coloring* DegreePriorityColoringV3(GraphStruct* graphStruct, int n, int edgeCount, priorityEnum priorityEnum)
+Coloring* DegreePriorityColoringV3(Graph& graph, priorityEnum priorityEnum)
 {
-	double start = seconds();
+	// Init
+	int n = graph.GetNodeCount();
+	int edgeCount = graph.GetEdgeCount();
+
+	std::cout << "Copying graph to device ..." << std::endl;
+	GraphStruct* d_graphStruct;
+	graph.copyToDevice(d_graphStruct);
+	
 	// Alloc and Init returning struct
+	double start = seconds();
 	uint* coloring = (uint*) malloc(n * sizeof(uint));
 	bool* coloredNodes = (bool*) malloc(n * sizeof(bool));
 	memset(coloring, 0, n * sizeof(uint));
@@ -453,7 +461,7 @@ Coloring* DegreePriorityColoringV3(GraphStruct* graphStruct, int n, int edgeCoun
 	cudaMemcpy(d_coloredNodes, coloredNodes, n * sizeof(bool), cudaMemcpyHostToDevice);
 
 	// Generate priorities using degrees
-	uint* d_priorities = calculateDegreePriority(graphStruct, priorityEnum, n);
+	uint* d_priorities = calculateDegreePriority(d_graphStruct, priorityEnum, n);
 
 	// Calculate inbound counters
 	dim3 blockDim(THREADxBLOCK);
@@ -464,7 +472,7 @@ Coloring* DegreePriorityColoringV3(GraphStruct* graphStruct, int n, int edgeCoun
 	CHECK(cudaMalloc((void**)&outboundCounts, n * sizeof(uint)));
 	cudaMemset(inboundCounts, 0, n * sizeof(uint));
 	cudaMemset(outboundCounts, 0, n * sizeof(uint));
-	calculateInbounds <<<gridDim, blockDim >>> (graphStruct, inboundCounts, d_priorities, n, outboundCounts);
+	calculateInbounds <<<gridDim, blockDim >>> (d_graphStruct, inboundCounts, d_priorities, n, outboundCounts);
 	cudaDeviceSynchronize();
 
 	// inizialize bitmaps, every node has a bitmap with a length of inbound edges + 1 TODO: alloc on gpu
@@ -508,9 +516,9 @@ Coloring* DegreePriorityColoringV3(GraphStruct* graphStruct, int n, int edgeCoun
 	while (*uncoloredFlag) {
 		*uncoloredFlag = false;
 		cudaMemcpy(d_uncoloredFlag, uncoloredFlag, sizeof(bool), cudaMemcpyHostToDevice);
-		colorWithInboundCountersBitmaps <<<gridDim, blockDim>>> (d_coloring, d_coloredNodes, graphStruct, inboundCounts, buffer, filledBuffer, bitmaps, bitmapIndex, d_uncoloredFlag);
+		colorWithInboundCountersBitmaps <<<gridDim, blockDim>>> (d_coloring, d_coloredNodes, d_graphStruct, inboundCounts, buffer, filledBuffer, bitmaps, bitmapIndex, d_uncoloredFlag);
 		cudaDeviceSynchronize();
-		applyBufferWithInboundCountersBitmaps <<<gridDim, blockDim>>>(d_coloring, d_coloredNodes, graphStruct, d_priorities, inboundCounts, buffer, filledBuffer, bitmaps, bitmapIndex);
+		applyBufferWithInboundCountersBitmaps <<<gridDim, blockDim>>>(d_coloring, d_coloredNodes, d_graphStruct, d_priorities, inboundCounts, buffer, filledBuffer, bitmaps, bitmapIndex);
 		cudaDeviceSynchronize();
 		iterationCount++;
 		//cudaMemcpy(h_priorities, priorities, n * sizeof(uint), cudaMemcpyDeviceToHost); //TODO: remove

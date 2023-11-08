@@ -57,5 +57,6 @@ public:
 	void getLDFDag(GraphStruct*);
 	void BuildLDFDagV2(Graph&);
 	int GetEdgeCount();
+	int GetNodeCount();
 	void AllocDagOnDevice(GraphStruct*);
 };

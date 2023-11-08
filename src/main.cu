@@ -12,10 +12,8 @@ int main(void) {
 
 	// new graph with n nodes
 	Graph graph(Graph::MemoryEnum::HostAllocated);
-	//graph.ReadFromMtxFile("inputData/soc-youtube-snap/soc-youtube-snap.mtx");
-	graph.ReadFromMtxFile("inputData/kron_g500-logn21/kron_g500-logn21.mtx");
-	GraphStruct* d_GraphStruct;
-	graph.copyToDevice(d_GraphStruct);
+	graph.ReadFromMtxFile("inputData/soc-youtube-snap/soc-youtube-snap.mtx");
+	//graph.ReadFromMtxFile("inputData/kron_g500-logn21/kron_g500-logn21.mtx");
 
 	// generate a random graph
 	//graph.randGraph(prob, engine, n);
@@ -42,7 +40,7 @@ int main(void) {
 	//Coloring* coloring = RandomPriorityColoringV2(graph); // 0.352     20k 1.424 con inbounds 0.97 msi
 	//Coloring* coloring = RandomPriorityColoringV3(graph); //                            0.96 72 colors
 	priorityEnum priorityEnum = LDF;
-	Coloring* coloring = DegreePriorityColoringV3(d_GraphStruct, graphStruct->nodeCount, graphStruct->edgeCount, priorityEnum);              // bitmaps 20k 0.018 1.029sec/0.914sec
+	Coloring* coloring = DegreePriorityColoringV3(graph, priorityEnum);              // bitmaps 20k 0.018 1.029sec/0.914sec
 	//test(graph);
 
 	

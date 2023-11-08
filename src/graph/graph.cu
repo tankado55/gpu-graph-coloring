@@ -301,6 +301,11 @@ int Graph::GetEdgeCount()
 	return graphStruct->edgeCount;
 }
 
+int Graph::GetNodeCount()
+{
+	return graphStruct->nodeCount;
+}
+
 
 
 void Graph::AllocManaged()
