@@ -73,12 +73,18 @@ void Graph::ReadFromMtxFile(const char* mtx) {
 	for (int i = 0; i < graphStruct->nodeCount; i++)
 		svector.push_back(s);
 	int dst, src;
+	int sameNodeCounter = 0;
 	for (int i = 0; i < graphStruct->edgeCount/2; i++) {
 		getline(cfile, str);
 		sscanf(str.c_str(), "%d %d", &dst, &src);
 
-		dst--;// -1 because the dataset begins with node id = 1
-		src--;
+		if (src == dst) {
+			sameNodeCounter++;
+			continue;
+		}
+
+		dst--; // -1 because the dataset begins with node id = 1
+		src--; // -1 because the dataset begins with node id = 1
 
 		svector[src].insert(dst);
 		svector[dst].insert(src);
@@ -93,6 +99,9 @@ void Graph::ReadFromMtxFile(const char* mtx) {
 	graphStruct->neighIndex[graphStruct->nodeCount] = count;
 	if (count != graphStruct->edgeCount) {
 		printf("The graph is not symmetric\n");
+		printf("found %d arc with src and dst equals\n", sameNodeCounter);
+		printf("real number of edges: %d\n", count);
+
 		graphStruct->edgeCount = count;
 	}
 	double avgdeg;
