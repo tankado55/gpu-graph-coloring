@@ -13,6 +13,12 @@ struct Coloring {
 	bool* coloredNodes;
 };
 
+enum priorityEnum
+{
+	LDF = 0,
+	SDF = 1
+};
+
 // probabilmente lo cancello, non ha molto senso tenersi lo stato dei colori fuori dalla GPU
 struct ColoringUtils {
 	int* availableColorIndex{ nullptr };
@@ -40,7 +46,7 @@ Coloring* RandomPriorityColoring(Graph& graph);
 void test(Graph& graph);
 Coloring* RandomPriorityColoringV2(Graph& graph);
 Coloring* RandomPriorityColoringV3(Graph& graph);
-Coloring* LDFColoringV3(GraphStruct*, int, int);
+Coloring* DegreePriorityColoringV3(GraphStruct*, int, int, priorityEnum);
 void printColoring(Coloring*, GraphStruct*, bool);
 __global__ void InitRandomPriorities(uint seed, curandState_t*, uint*, uint);
 __global__ void findIS(Coloring*, GraphStruct*, uint*);

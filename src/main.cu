@@ -33,23 +33,22 @@ int main(void) {
 	}
 
 	//-------------- START TIME ----------------//
-	double start = seconds();
+	
 
 	
 	//Colorer colorer(&graph);
 	//Coloring* coloring = RandomPriorityColoring(graph);     // 0.375 20k 1.509 no inbound
 	//Coloring* coloring = RandomPriorityColoringV2(graph); // 0.352     20k 1.424 con inbounds 0.97 msi
-	//Coloring* coloring = RandomPriorityColoringV3(graph); //                                0.96 72 colors
-	Coloring* coloring = LDFColoringV3(d_GraphStruct, graphStruct->nodeCount, graphStruct->edgeCount);              // bitmaps 20k 0.018 1.029sec/0.914sec
+	//Coloring* coloring = RandomPriorityColoringV3(graph); //                            0.96 72 colors
+	priorityEnum priorityEnum = SDF;
+	Coloring* coloring = DegreePriorityColoringV3(d_GraphStruct, graphStruct->nodeCount, graphStruct->edgeCount, priorityEnum);              // bitmaps 20k 0.018 1.029sec/0.914sec
 	//test(graph);
 
-	double stop = seconds();
+	
 	//-------------- END TIME ----------------//
 
 	//printColoring(coloring, graphStruct, 1);
 	std::cout << "Iterations: " << coloring->iterationCount << std::endl;
-
-	std::cout << elapsedTime(start, stop) << std::endl;
 
 	validateColoring(coloring, graphStruct);
 

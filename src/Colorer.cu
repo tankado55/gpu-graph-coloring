@@ -325,13 +325,22 @@ __global__ void InitRandomPriorities(uint seed, curandState_t* states, uint* pri
 	priorities[idx] = curand(&states[idx]) % n * n;
 }
 
-__global__ void InitLDFPriorities(GraphStruct* graphStruct, uint* priorities, uint n) {
+__global__ void InitLDFPriorities(GraphStruct* graphStruct, uint* priorities, uint n) { //TODO: passa direttamente neighIndex
 	uint idx = blockIdx.x * blockDim.x + threadIdx.x;
 	if (idx >= n)
 		return;
 	priorities[idx] = graphStruct->neighIndex[idx + 1] - graphStruct->neighIndex[idx];
 }
 
+__global__ void InitSDFPriorities(GraphStruct* graphStruct, uint* priorities, uint n) { //TODO: passa direttamente neighIndex
+	uint idx = blockIdx.x * blockDim.x + threadIdx.x;
+	if (idx >= n)
+		return;
+	priorities[idx] = UINT_MAX - (graphStruct->neighIndex[idx + 1] - graphStruct->neighIndex[idx]);
+	if (idx < 10) {
+		printf("priority: \n", priorities[idx]);
+	}
+}
 
 
 /**
@@ -410,19 +419,27 @@ Coloring* RandomPriorityColoring(Graph& graph) // no inboundsCount, no bitmap no
 	return coloring;
 }
 
-uint* calculateSDFPriorities(const GraphStruct* graphStruct, int n)
+uint* calculateDegreePriority(GraphStruct* graphStruct, priorityEnum priorityEnum, int n)
 {
-	uint* priorities;
-	cudaMalloc((void**)&priorities, n * sizeof(uint));
+	uint* d_priorities;
+	cudaMalloc((void**)&d_priorities, n * sizeof(uint));
 	dim3 blockDim(THREADxBLOCK);
 	dim3 gridDim((n + blockDim.x - 1) / blockDim.x, 1, 1);
-	InitLDFPriorities <<<gridDim, blockDim >>> (graphStruct, priorities, n);
+	if (priorityEnum == LDF)
+	{
+		InitLDFPriorities <<<gridDim, blockDim>>> (graphStruct, d_priorities, n);
+	}
+	else if (priorityEnum == SDF)
+	{
+		InitSDFPriorities <<<gridDim, blockDim>>> (graphStruct, d_priorities, n);
+	}
 	cudaDeviceSynchronize();
-	return priorities;
+	return d_priorities;
 }
 
-Coloring* LDFColoringV3(GraphStruct* graphStruct, int n, int edgeCount)
+Coloring* DegreePriorityColoringV3(GraphStruct* graphStruct, int n, int edgeCount, priorityEnum priorityEnum)
 {
+	double start = seconds();
 	// Alloc and Init returning struct
 	uint* coloring = (uint*) malloc(n * sizeof(uint));
 	bool* coloredNodes = (bool*) malloc(n * sizeof(bool));
@@ -435,22 +452,19 @@ Coloring* LDFColoringV3(GraphStruct* graphStruct, int n, int edgeCount)
 	cudaMemcpy(d_coloring,coloring, n * sizeof(uint), cudaMemcpyHostToDevice);
 	cudaMemcpy(d_coloredNodes, coloredNodes, n * sizeof(bool), cudaMemcpyHostToDevice);
 
-	// Generate LDF priorities
-	uint* priorities;
-	cudaMalloc((void**)&priorities, n * sizeof(uint));
-	dim3 blockDim(THREADxBLOCK);
-	dim3 gridDim((n + blockDim.x - 1) / blockDim.x, 1, 1);
-	InitLDFPriorities <<<gridDim, blockDim >>> (graphStruct, priorities, n);
-	cudaDeviceSynchronize();
+	// Generate priorities using degrees
+	uint* d_priorities = calculateDegreePriority(graphStruct, priorityEnum, n);
 
 	// Calculate inbound counters
+	dim3 blockDim(THREADxBLOCK);
+	dim3 gridDim((n + blockDim.x - 1) / blockDim.x, 1, 1);
 	uint* inboundCounts;
 	uint* outboundCounts;
 	CHECK(cudaMalloc((void**)&inboundCounts, n * sizeof(uint)));
 	CHECK(cudaMalloc((void**)&outboundCounts, n * sizeof(uint)));
 	cudaMemset(inboundCounts, 0, n * sizeof(uint));
 	cudaMemset(outboundCounts, 0, n * sizeof(uint));
-	calculateInbounds << <gridDim, blockDim >> > (graphStruct, inboundCounts, priorities, n, outboundCounts);
+	calculateInbounds <<<gridDim, blockDim >>> (graphStruct, inboundCounts, d_priorities, n, outboundCounts);
 	cudaDeviceSynchronize();
 
 	// inizialize bitmaps, every node has a bitmap with a length of inbound edges + 1 TODO: alloc on gpu
@@ -488,21 +502,27 @@ Coloring* LDFColoringV3(GraphStruct* graphStruct, int n, int edgeCount)
 	*uncoloredFlag = true;
 	bool* d_uncoloredFlag;
 	cudaMalloc((void**)&d_uncoloredFlag, sizeof(bool));
+	double stop = seconds();
+	std::cout << "Initialization: " << elapsedTime(start, stop) << std::endl;
+	start = seconds();
 	while (*uncoloredFlag) {
 		*uncoloredFlag = false;
 		cudaMemcpy(d_uncoloredFlag, uncoloredFlag, sizeof(bool), cudaMemcpyHostToDevice);
 		colorWithInboundCountersBitmaps <<<gridDim, blockDim>>> (d_coloring, d_coloredNodes, graphStruct, inboundCounts, buffer, filledBuffer, bitmaps, bitmapIndex, d_uncoloredFlag);
 		cudaDeviceSynchronize();
-		applyBufferWithInboundCountersBitmaps <<<gridDim, blockDim>>>(d_coloring, d_coloredNodes, graphStruct, priorities, inboundCounts, buffer, filledBuffer, bitmaps, bitmapIndex);
+		applyBufferWithInboundCountersBitmaps <<<gridDim, blockDim>>>(d_coloring, d_coloredNodes, graphStruct, d_priorities, inboundCounts, buffer, filledBuffer, bitmaps, bitmapIndex);
 		cudaDeviceSynchronize();
 		iterationCount++;
 		//cudaMemcpy(h_priorities, priorities, n * sizeof(uint), cudaMemcpyDeviceToHost); //TODO: remove
 		cudaMemcpy(uncoloredFlag, d_uncoloredFlag, sizeof(bool), cudaMemcpyDeviceToHost);
 		cudaDeviceSynchronize();
 	}
+	stop = seconds();
+	std::cout << "Processing: " << elapsedTime(start, stop) << std::endl;
+
 
 	// Free
-	cudaFree(priorities);
+	cudaFree(d_priorities);
 	cudaFree(inboundCounts);
 	cudaFree(buffer);
 	cudaFree(filledBuffer);
@@ -538,8 +558,8 @@ __global__ void colorWithInboundCountersBitmaps(uint* coloring, bool* coloredNod
 	if (inboundCounts[idx] == 0) // Ready node
 	{
 		int colorCount = bitmapIndex[idx + 1] - bitmapIndex[idx];
-		if (idx == 18836)
-			printf("I'm %d, total colors: %d\n", idx, colorCount);
+		//if (idx == 18836)
+		//	printf("I'm %d, total colors: %d\n", idx, colorCount);
 
 		int bestColor = colorCount;
 		for (int i = 0; i < colorCount; ++i)
@@ -547,8 +567,8 @@ __global__ void colorWithInboundCountersBitmaps(uint* coloring, bool* coloredNod
 			if (bitmaps[bitmapIndex[idx] + i])
 			{
 				bestColor = i;
-				if (idx == 18836)
-					printf("I'm: %d, ---------best color: %d\n", idx, bestColor);
+				//if (idx == 18836)
+				//	printf("I'm: %d, ---------best color: %d\n", idx, bestColor);
 				break;
 			}
 		}
@@ -593,10 +613,10 @@ __global__ void applyBufferWithInboundCountersBitmaps(uint* coloring, bool* colo
 			if (buffer[idx] < colorCount)
 				bitmaps[bitmapIndex[neighID] + buffer[idx]] = 0;
 
-			if (neighID == 18836) {
-				printf("I'm: %d, ---------removed arc to: %d, still: %d\n", idx, neighID, inboundCounts[neighID]);
-				printf("%d, %d, %d, %d, %d\n", bitmaps[bitmapIndex[neighID] + 0], bitmaps[bitmapIndex[neighID] + 1], bitmaps[bitmapIndex[neighID] + 2], bitmaps[bitmapIndex[neighID] + 3], bitmaps[bitmapIndex[neighID] + 4]);
-			}
+			//if (neighID == 18836) {
+			//	printf("I'm: %d, ---------removed arc to: %d, still: %d\n", idx, neighID, inboundCounts[neighID]);
+			//	printf("%d, %d, %d, %d, %d\n", bitmaps[bitmapIndex[neighID] + 0], bitmaps[bitmapIndex[neighID] + 1], bitmaps[bitmapIndex[neighID] + 2], bitmaps[bitmapIndex[neighID] + 3], bitmaps[bitmapIndex[neighID] + 4]);
+			//}
 		}
 		else if (priorities[idx] == priorities[neighID] && idx > neighID)
 		{
@@ -605,10 +625,10 @@ __global__ void applyBufferWithInboundCountersBitmaps(uint* coloring, bool* colo
 			if (buffer[idx] < colorCount)
 				bitmaps[bitmapIndex[neighID] + buffer[idx]] = 0;
 
-			if (neighID == 18836) {
-				printf("I'm: %d, ---------removed arc to: %d, still: %d\n", idx, neighID, inboundCounts[neighID]);
-				printf("%d, %d, %d, %d, %d\n", bitmaps[bitmapIndex[neighID] + 0], bitmaps[bitmapIndex[neighID] + 1], bitmaps[bitmapIndex[neighID] + 2], bitmaps[bitmapIndex[neighID] + 3], bitmaps[bitmapIndex[neighID] + 4]);
-			}
+			//if (neighID == 18836) {
+			//	printf("I'm: %d, ---------removed arc to: %d, still: %d\n", idx, neighID, inboundCounts[neighID]);
+			//	printf("%d, %d, %d, %d, %d\n", bitmaps[bitmapIndex[neighID] + 0], bitmaps[bitmapIndex[neighID] + 1], bitmaps[bitmapIndex[neighID] + 2], bitmaps[bitmapIndex[neighID] + 3], bitmaps[bitmapIndex[neighID] + 4]);
+			//}
 		}
 		else {
 			//if (neighID == 3)
@@ -616,8 +636,8 @@ __global__ void applyBufferWithInboundCountersBitmaps(uint* coloring, bool* colo
 		}
 		
 	}
-	if (idx == 18836)
-		printf("I'm: %d, colored: %d \n", idx, buffer[idx]);
+	//if (idx == 18836)
+	//	printf("I'm: %d, colored: %d \n", idx, buffer[idx]);
 
 	coloring[idx] = buffer[idx];
 	coloredNodes[idx] = true;
