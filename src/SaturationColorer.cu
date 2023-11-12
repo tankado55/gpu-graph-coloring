@@ -1,10 +1,10 @@
 #include <iostream>
-#include "IncidenceColorer.h"
+#include "SaturationColorer.h"
 #include "device_launch_parameters.h"
 #include "utils/common.h"
 #include <cooperative_groups.h>
 
-__global__ void colorIncidence(bool* isColored, GraphStruct* graphStruct, uint* buffer, bool* filledBuffer, bool* bitmaps, uint* bitmapIndex, uint* priorities, bool* uncoloredFlag)
+__global__ void colorSaturation(bool* isColored, GraphStruct* graphStruct, uint* buffer, bool* filledBuffer, bool* bitmaps, uint* bitmapIndex, uint* priorities, bool* uncoloredFlag)
 {//d_coloredNodes, d_graphStruct, buffer, filledBuffer, bitmaps, bitmapIndex, d_priorities, d_uncoloredFlag
 	uint idx = threadIdx.x + blockDim.x * blockIdx.x;
 
@@ -52,7 +52,7 @@ __global__ void colorIncidence(bool* isColored, GraphStruct* graphStruct, uint* 
 	}
 }
 
-__global__ void applyBufferIncidence(uint* coloring, bool* isColored, GraphStruct* graphStruct, uint* buffer, 
+__global__ void applyBufferSaturation(uint* coloring, bool* isColored, GraphStruct* graphStruct, uint* buffer,
 	bool* filledBuffer, uint* priorities, bool* bitmaps, uint* bitmapIndex, unsigned n)
 {
 	uint idx = threadIdx.x + blockDim.x * blockIdx.x;
@@ -77,10 +77,16 @@ __global__ void applyBufferIncidence(uint* coloring, bool* isColored, GraphStruc
 	{
 		uint neighID = graphStruct->neighs[offset + i];
 
-		atomicAdd(&priorities[neighID], 1);
+
 		int neighColorCount = bitmapIndex[neighID + 1] - bitmapIndex[neighID];
 		if (buffer[idx] < neighColorCount)
+		{
 			bitmaps[bitmapIndex[neighID] + buffer[idx]] = 0;
+		}
+		else {
+			//atomicAdd(&priorities[neighID], 1);
+		}
+
 		/*if (idx == 3 && neighID == 114) {
 			printf("id: %d, %d, color: %d, neigh color count: %d\n", idx, neighID, buffer[idx], neighColorCount);
 		}*/
@@ -90,9 +96,25 @@ __global__ void applyBufferIncidence(uint* coloring, bool* isColored, GraphStruc
 	}*/
 }
 
+__global__ void updatePriorities(bool* isColored, GraphStruct* graphStruct, uint* priorities, bool* bitmaps, uint* bitmapIndex, unsigned n)
+{
+	uint idx = threadIdx.x + blockDim.x * blockIdx.x;
 
+	if (idx >= n)
+		return;
+	if (isColored[idx])
+		return;
 
-Coloring* IncidenceColorer::color(Graph& graph)
+	int sum = 0;
+	uint colorCount = bitmapIndex[idx + 1] - bitmapIndex[idx];
+	for (int i = 0; i < colorCount; i++)
+	{
+		sum += bitmaps[bitmapIndex[idx] + i];
+	}
+	priorities[idx] = colorCount - sum;
+}
+
+Coloring* SaturationColorer::color(Graph& graph)
 {
 	// Init
 	unsigned n = graph.GetNodeCount();
@@ -159,12 +181,12 @@ Coloring* IncidenceColorer::color(Graph& graph)
 	while (*uncoloredFlag) {
 		*uncoloredFlag = false;
 		cudaMemcpy(d_uncoloredFlag, uncoloredFlag, sizeof(bool), cudaMemcpyHostToDevice);
-		colorIncidence <<<gridDim, blockDim >>> (d_isColored, d_graphStruct, buffer, filledBuffer, bitmaps, bitmapIndex, d_priorities, d_uncoloredFlag);
+		colorSaturation << <gridDim, blockDim >> > (d_isColored, d_graphStruct, buffer, filledBuffer, bitmaps, bitmapIndex, d_priorities, d_uncoloredFlag);
 		cudaDeviceSynchronize();
-		cudaMemcpy(uncoloredFlag, d_uncoloredFlag, sizeof(bool), cudaMemcpyDeviceToHost);
-		cudaDeviceSynchronize();
-		applyBufferIncidence << <gridDim, blockDim >> > (
+		applyBufferSaturation << <gridDim, blockDim >> > (
 			d_coloring, d_isColored, d_graphStruct, buffer, filledBuffer, d_priorities, bitmaps, bitmapIndex, n);
+		cudaDeviceSynchronize();
+		updatePriorities << <gridDim, blockDim >> > (d_isColored, d_graphStruct, d_priorities, bitmaps, bitmapIndex, n);
 		cudaDeviceSynchronize();
 		cudaMemcpy(uncoloredFlag, d_uncoloredFlag, sizeof(bool), cudaMemcpyDeviceToHost);
 		cudaDeviceSynchronize();
