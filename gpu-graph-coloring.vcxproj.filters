@@ -21,7 +21,8 @@
     <CudaCompile Include="src\graph\graph.cu">
       <Filter>Source Files</Filter>
     </CudaCompile>
-    <CudaCompile Include="src\OldColorer.cu" />
+    <CudaCompile Include="src\old\OldColorer.cu" />
+    <CudaCompile Include="src\IncidenceColorer.cu" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Colorer.h">
@@ -37,6 +38,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\utils\ColoringValidator.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\IncidenceColorer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

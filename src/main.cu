@@ -1,12 +1,13 @@
 
+#include <iostream>
 #include "Colorer.h"
 #include "utils/common.h"
 #include "graph/graph.h"
 #include "utils/ColoringValidator.h"
-#include <iostream>
+#include "IncidenceColorer.h"
 
 int main(void) {
-	unsigned int n = 20000;		 // 80k ok 115 mln edge
+	unsigned int n = 20000;
 	float prob = .018;				    // density (percentage) for random graphs
 	std::default_random_engine engine{ 0 };  // fixed seed
 
@@ -38,9 +39,10 @@ int main(void) {
 	//Colorer colorer(&graph);
 	//Coloring* coloring = RandomPriorityColoring(graph);     // 0.375 20k 1.509 no inbound
 	//Coloring* coloring = RandomPriorityColoringV2(graph); // 0.352     20k 1.424 con inbounds 0.97 msi
-	//Coloring* coloring = RandomPriorityColoringV3(graph); //                            0.96 72 colors
+	//Coloring* coloring = RandomPriorityColoringV3(graph);
 	priorityEnum priorityEnum = LDF;
-	Coloring* coloring = DegreePriorityColoringV3(graph, priorityEnum);              // bitmaps 20k 0.018 1.029sec/0.914sec
+	//Coloring* coloring = DegreePriorityColoringV3(graph, priorityEnum);              // bitmaps 20k 0.018 1.029sec/0.914sec
+	Coloring* coloring = IncidenceColorer::color(graph);          // bitmaps 20k 0.018 1.029sec/0.914sec
 	//test(graph);
 
 	

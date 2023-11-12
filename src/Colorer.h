@@ -6,6 +6,8 @@
 #include "graph/graph.h"
 #include "utils/common.h"
 
+#define THREADxBLOCK 128
+
 struct Coloring {
 	bool uncoloredFlag;
 	uint iterationCount;
@@ -34,7 +36,6 @@ public:
 	~Colorer();
 };
 
-Coloring* RandomPriorityColoringCPUSequentialV2();
 Coloring* RandomPriorityColoring(Graph& graph);
 
 void test(Graph& graph);
@@ -43,7 +44,7 @@ Coloring* RandomPriorityColoringV3(Graph& graph);
 Coloring* DegreePriorityColoringV3(Graph& graph, priorityEnum);
 void printColoring(Coloring*, GraphStruct*, bool);
 __global__ void InitRandomPriorities(uint seed, curandState_t*, uint*, uint);
-__global__ void findIS(Coloring*, GraphStruct*, uint*);
+__global__ void colorIS(Coloring*, GraphStruct*, uint*);
 __global__ void print_d(GraphStruct*, bool);
 __global__ void applyBufferWithInboundCountersBitmaps(uint*, bool*, GraphStruct*, unsigned*, unsigned*, unsigned*, bool*, bool*, uint*);
 __global__ void colorWithInboundCountersBitmaps(uint*, bool*, GraphStruct*, uint*, uint*, bool*, bool*, uint*, bool*);

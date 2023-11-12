@@ -7,7 +7,7 @@
 
 #include "colorer.h"
 
-#define THREADxBLOCK 128
+
 
 Colorer::Colorer(Graph* graph)
 {
@@ -194,7 +194,7 @@ __global__ void calculateInbounds(GraphStruct* graphStruct, unsigned int* inboun
 /**
  * find an IS
  */
-__global__ void findIS(Coloring* col, GraphStruct* graphStruct, uint* weights, unsigned* buffer, bool* filledBuffer)
+__global__ void colorIS(Coloring* col, GraphStruct* graphStruct, uint* weights, unsigned* buffer, bool* filledBuffer)
 {
 	uint idx = threadIdx.x + blockDim.x * blockIdx.x;
 
@@ -227,6 +227,10 @@ __global__ void findIS(Coloring* col, GraphStruct* graphStruct, uint* weights, u
 		//printf("not candidate: %d, color: %d\n", idx, col->numOfColors);
 	}
 }
+
+
+
+
 
 __global__ void applyBuffer(Coloring* coloring, unsigned* buffer, bool* filledBuffer, unsigned n)
 {
@@ -400,7 +404,7 @@ Coloring* RandomPriorityColoring(Graph& graph) // no inboundsCount, no bitmap no
 	coloring->iterationCount = 0;
 	while (coloring->uncoloredFlag) {
 		coloring->uncoloredFlag = false;
-		findIS << <gridDim, blockDim >> > (coloring, graphStruct, priorities, buffer, filledBuffer);
+		colorIS << <gridDim, blockDim >> > (coloring, graphStruct, priorities, buffer, filledBuffer);
 		cudaDeviceSynchronize();
 		applyBuffer << <gridDim, blockDim >> > (coloring, buffer, filledBuffer, n);
 		cudaDeviceSynchronize();
@@ -478,7 +482,6 @@ Coloring* DegreePriorityColoringV3(Graph& graph, priorityEnum priorityEnum)
 	// inizialize bitmaps, every node has a bitmap with a length of inbound edges + 1 TODO: alloc on gpu
 	// vision: allocare tutto in un array come al solito ma serve la prefix sum
 	// alternativa1: sequenziale O(n)
-	// alternativa2: le bitmap vengono allocate staticamente nel kernel, basterebbe poi costruire un index, non sono sequenziali ma penso sia ok
 	bool* bitmaps;
 	uint bitCount = (n + (int)(edgeCount + 1) / 2);
 	CHECK(cudaMallocManaged(&(bitmaps), bitCount * sizeof(bool)));
@@ -520,10 +523,10 @@ Coloring* DegreePriorityColoringV3(Graph& graph, priorityEnum priorityEnum)
 		cudaDeviceSynchronize();
 		applyBufferWithInboundCountersBitmaps <<<gridDim, blockDim>>>(d_coloring, d_coloredNodes, d_graphStruct, d_priorities, inboundCounts, buffer, filledBuffer, bitmaps, bitmapIndex);
 		cudaDeviceSynchronize();
-		iterationCount++;
 		//cudaMemcpy(h_priorities, priorities, n * sizeof(uint), cudaMemcpyDeviceToHost); //TODO: remove
 		cudaMemcpy(uncoloredFlag, d_uncoloredFlag, sizeof(bool), cudaMemcpyDeviceToHost);
 		cudaDeviceSynchronize();
+		iterationCount++;
 	}
 	stop = seconds();
 	std::cout << "Processing: " << elapsedTime(start, stop) << std::endl;

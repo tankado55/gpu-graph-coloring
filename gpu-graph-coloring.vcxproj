@@ -136,7 +136,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <CudaCompile Include="src\Colorer.cu" />
-    <CudaCompile Include="src\OldColorer.cu">
+    <CudaCompile Include="src\IncidenceColorer.cu" />
+    <CudaCompile Include="src\old\OldColorer.cu">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </CudaCompile>
@@ -145,6 +146,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Colorer.h" />
+    <ClInclude Include="src\IncidenceColorer.h" />
     <ClInclude Include="src\utils\ColoringValidator.h" />
     <ClInclude Include="src\utils\common.h" />
     <ClInclude Include="src\graph\graph.h" />
