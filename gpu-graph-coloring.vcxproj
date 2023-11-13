@@ -144,11 +144,13 @@
     <CudaCompile Include="src\main.cu" />
     <CudaCompile Include="src\graph\graph_d.cu" />
     <CudaCompile Include="src\SaturationColorer.cu" />
+    <CudaCompile Include="src\SmallestDegreeLast.cu" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Colorer.h" />
     <ClInclude Include="src\IncidenceColorer.h" />
     <ClInclude Include="src\SaturationColorer.h" />
+    <ClInclude Include="src\SmallestDegreeLast.h" />
     <ClInclude Include="src\utils\ColoringValidator.h" />
     <ClInclude Include="src\utils\common.h" />
     <ClInclude Include="src\graph\graph.h" />

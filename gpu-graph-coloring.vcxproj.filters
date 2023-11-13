@@ -24,6 +24,7 @@
     <CudaCompile Include="src\old\OldColorer.cu" />
     <CudaCompile Include="src\IncidenceColorer.cu" />
     <CudaCompile Include="src\SaturationColorer.cu" />
+    <CudaCompile Include="src\SmallestDegreeLast.cu" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Colorer.h">
@@ -45,6 +46,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\SaturationColorer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\SmallestDegreeLast.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

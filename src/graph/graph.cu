@@ -104,20 +104,19 @@ void Graph::ReadFromMtxFile(const char* mtx) {
 
 		graphStruct->edgeCount = count;
 	}
-	double avgdeg;
 	double variance = 0.0;
 	int maxdeg = 0;
 	int mindeg = graphStruct->nodeCount;
-	avgdeg = (double)graphStruct->edgeCount / graphStruct->nodeCount;
+	avgDeg = (double)graphStruct->edgeCount / graphStruct->nodeCount;
 	for (int i = 0; i < graphStruct->nodeCount; i++) {
 		int deg_i = graphStruct->neighIndex[i + 1] - graphStruct->neighIndex[i];
 		if (deg_i > maxdeg)
 			maxdeg = deg_i;
 		if (deg_i < mindeg)
 			mindeg = deg_i;
-		variance += (deg_i - avgdeg) * (deg_i - avgdeg) / graphStruct->nodeCount;
+		variance += (deg_i - avgDeg) * (deg_i - avgDeg) / graphStruct->nodeCount;
 	}
-	printf("mindeg %d maxdeg %d avgdeg %.2f variance %.2f\n", mindeg, maxdeg, avgdeg, variance);
+	printf("mindeg %d maxdeg %d avgdeg %.2f variance %.2f\n", mindeg, maxdeg, avgDeg, variance);
 	graphStruct->neighs = (uint*)malloc(graphStruct->edgeCount * sizeof(int));
 	set<int>::iterator site;
 	for (int i = 0, index = 0; i < graphStruct->nodeCount; i++) {
@@ -202,7 +201,7 @@ void Graph::randGraph(float prob, std::default_random_engine & eng, unsigned n) 
 			minDeg = graphStruct->deg(i);
 	}
 	density = (float)graphStruct->edgeCount / (float)(n * (n - 1));
-	meanDeg = (float)graphStruct->edgeCount / (float)n;
+	avgDeg = (float)graphStruct->edgeCount / (float)n;
 	if (minDeg == 0)
 		connected = false;
 	else
@@ -301,9 +300,14 @@ int Graph::GetEdgeCount()
 	return graphStruct->edgeCount;
 }
 
-int Graph::GetNodeCount()
+uint Graph::GetNodeCount()
 {
 	return graphStruct->nodeCount;
+}
+
+double Graph::GetAvgDeg()
+{
+	return avgDeg;
 }
 
 
@@ -345,7 +349,7 @@ void Graph::print(bool verbose)
 	cout << "** Graph (num node: " << n << ", num edges: " << graphStruct->edgeCount
 			<< ")" << endl;
 	cout << "         (min deg: " << minDeg << ", max deg: " << maxDeg
-		 << ", mean deg: " << meanDeg << ", connected: " << connected << ")"
+		 << ", mean deg: " << avgDeg << ", connected: " << connected << ")"
 		 << endl;
 
 	if (verbose) {

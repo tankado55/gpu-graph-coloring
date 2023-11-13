@@ -6,6 +6,7 @@
 #include "utils/ColoringValidator.h"
 #include "IncidenceColorer.h"
 #include "SaturationColorer.h"
+#include "SmallestDegreeLast.h"
 
 int main(void) {
 	unsigned int n = 20000;
@@ -44,7 +45,8 @@ int main(void) {
 	priorityEnum priorityEnum = LDF;
 	//Coloring* coloring = DegreePriorityColoringV3(graph, priorityEnum);              // bitmaps 20k 0.018 1.029sec/0.914sec
 	//Coloring* coloring = IncidenceColorer::color(graph);
-	Coloring* coloring = SaturationColorer::color(graph);
+	//Coloring* coloring = SaturationColorer::color(graph);
+	Coloring* coloring = SmallestDegreeLast::color(graph);
 	//test(graph);
 
 	

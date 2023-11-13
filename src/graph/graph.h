@@ -1,6 +1,6 @@
-
 #pragma once
 
+#include "../utils/common.h"
 #include <random>
 
 /**
@@ -35,7 +35,7 @@ private:
 	GraphStruct * graphStruct{nullptr};     // graph structure
 	unsigned maxDeg{0};
 	unsigned minDeg{0};
-	float meanDeg{0.0f};
+	double avgDeg{0.0f};
 	bool connected{true};
 	void AllocManaged();                 // use UVA memory on CPU/GPU
 	void FreeManaged();
@@ -57,6 +57,7 @@ public:
 	void getLDFDag(GraphStruct*);
 	void BuildLDFDagV2(Graph&);
 	int GetEdgeCount();
-	int GetNodeCount();
+	uint GetNodeCount();
+	double GetAvgDeg();
 	void AllocDagOnDevice(GraphStruct*);
 };

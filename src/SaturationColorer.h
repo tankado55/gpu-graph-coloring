@@ -1,5 +1,4 @@
 #pragma once
-
 #include "Colorer.h"
 
 class SaturationColorer : public Colorer
