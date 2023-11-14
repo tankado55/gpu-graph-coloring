@@ -2,19 +2,32 @@
 #include "SmallestDegreeLast.h"
 #include "utils/common.h"
 
-__global__ void assignPriority(uint* priorities, GraphStruct* graphStruct, uint avgDeg, uint i, int* remainingCount, int* sumDeg)
+__global__ void assignPriority(uint* priorities, GraphStruct* graphStruct, double avgDeg, uint i, int* remainingCount, int* sumDeg)
 {
     uint idx = threadIdx.x + blockDim.x * blockIdx.x;
-
+	if (idx >= graphStruct->nodeCount)
+		return;
     if (priorities[idx])
         return;
 
     uint deg = graphStruct->neighIndex[idx + 1] - graphStruct->neighIndex[idx];
-    if (deg <= avgDeg)
+
+	uint offset = graphStruct->neighIndex[idx];
+	uint currentDeg = 0;
+	for (uint i = 0; i < deg; ++i)
+	{
+		int neighId = graphStruct->neighs[offset + i];
+		if (!priorities[neighId])
+		{
+			currentDeg++;
+		}
+	}
+
+    if (currentDeg <= avgDeg)
     {
         priorities[idx] = i;
         atomicSub(remainingCount, 1); //TODO: check if it works
-        atomicSub(sumDeg, deg);
+        atomicSub(sumDeg, deg); // not properly correct
     }
 }
 
@@ -41,9 +54,16 @@ uint* SmallestDegreeLast::calculatePriority(Graph& graph, GraphStruct* d_graphSt
     while (*remainingCount > 0)
     {
         avgDeg = *sumDeg / *remainingCount;
-        assignPriority <<<gridDim, blockDim>>> (d_priorities, d_graphStruct, avgDeg, i, remainingCount, sumDeg);
-        cudaDeviceSynchronize();
-		++i;
+		//avgDeg++;
+		while (true)
+		{
+			int prevRemainingCount = *remainingCount;
+			assignPriority << <gridDim, blockDim >> > (d_priorities, d_graphStruct, avgDeg, i, remainingCount, sumDeg);
+			cudaDeviceSynchronize();
+			if (prevRemainingCount == *remainingCount)
+				break;
+			++i;
+		}
     }
     return d_priorities;
 }
