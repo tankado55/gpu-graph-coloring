@@ -1,8 +1,9 @@
 #include <iostream>
 #include "SmallestDegreeLast.h"
 #include "utils/common.h"
+#include "utils/MyDebug.h"
 
-__global__ void assignPriority(uint* priorities, GraphStruct* graphStruct, double avgDeg, uint i, int* remainingCount, int* sumDeg)
+__global__ void assignPriority(uint* priorities, GraphStruct* graphStruct, double avgDeg, uint priority, int* remainingCount, int* sumDeg)
 {
     uint idx = threadIdx.x + blockDim.x * blockIdx.x;
 	if (idx >= graphStruct->nodeCount)
@@ -17,7 +18,7 @@ __global__ void assignPriority(uint* priorities, GraphStruct* graphStruct, doubl
 	for (uint i = 0; i < deg; ++i)
 	{
 		int neighId = graphStruct->neighs[offset + i];
-		if (!priorities[neighId])
+		if (priorities[neighId] == 0 || priorities[neighId] == priority)
 		{
 			currentDeg++;
 		}
@@ -25,9 +26,9 @@ __global__ void assignPriority(uint* priorities, GraphStruct* graphStruct, doubl
 
     if (currentDeg <= avgDeg)
     {
-        priorities[idx] = i;
-        atomicSub(remainingCount, 1); //TODO: check if it works
-        atomicSub(sumDeg, deg); // not properly correct
+        priorities[idx] = priority;
+        atomicSub(remainingCount, 1);
+        //atomicSub(sumDeg, deg); // not properly correct, possible solution: keep a buffer of current deg and sum it in parallel after each step
     }
 }
 
@@ -51,10 +52,10 @@ uint* SmallestDegreeLast::calculatePriority(Graph& graph, GraphStruct* d_graphSt
     cudaMalloc((void**)&d_priorities, graph.GetNodeCount() * sizeof(uint));
 
     int i = 1;
-    while (*remainingCount > 0)
+    while (*remainingCount > 0) // TODO: if I don't use the average I can use a flag
     {
-        avgDeg = *sumDeg / *remainingCount;
-		//avgDeg++;
+        //avgDeg = *sumDeg / *remainingCount;
+		avgDeg++;
 		while (true)
 		{
 			int prevRemainingCount = *remainingCount;

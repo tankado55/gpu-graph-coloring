@@ -52,7 +52,6 @@ public:
 	void randGraph(float, std::default_random_engine&, unsigned);  // generate an Erdos random graph
 	void BuildRandomDAG(Graph&);
 	void print(bool);
-	void print_d(GraphStruct *, bool);
 	GraphStruct* getStruct() {return graphStruct;}
 	void getLDFDag(GraphStruct*);
 	void BuildLDFDagV2(Graph&);
