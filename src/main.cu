@@ -15,7 +15,7 @@ int main(void) {
 	//std::default_random_engine engine{ 0 };  // fixed seed
 	//graph.randGraph(prob, engine, n);
 
-	Graph graph(Graph::MemoryEnum::HostAllocated);
+	Graph graph;
 	graph.ReadFromMtxFile("inputData/soc-youtube-snap/soc-youtube-snap.mtx");
 	//graph.ReadFromMtxFile("inputData/kron_g500-logn21/kron_g500-logn21.mtx");
 

@@ -83,7 +83,7 @@ __global__ void findISLDF(Coloring* coloring, GraphStruct* graphStruct, bool* bi
 Coloring* Colorer::RandomPriorityColoringCPUSequential()
 {
 	// DAG
-	Graph dag(Graph::MemoryEnum::HostAllocated);
+	Graph dag;
 	m_Graph->BuildRandomDAG(dag);
 
 	// temp data inizialization

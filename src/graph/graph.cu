@@ -11,32 +11,17 @@
 
 using namespace std;
 
-Graph::Graph(MemoryEnum mem) {
-	memoryEnum = mem;
+Graph::Graph() {
 	Init();
 }
 
 Graph::~Graph()
 {
-	if (memoryEnum == ManagedAllocated)
-	{
-		FreeManaged();
-	}
-	else
-	{
-		delete graphStruct;
-	}
+	delete graphStruct;
 }
 
 void Graph::Init() {
-	if (memoryEnum == ManagedAllocated)
-	{
-		CHECK(cudaMallocManaged(&graphStruct, sizeof(GraphStruct)));
-	}
-	else
-	{
-		graphStruct = new GraphStruct();
-	}
+	graphStruct = new GraphStruct();
 	graphStruct->nodeCount = graphStruct->edgeCount = 0;
 	graphStruct->neighIndex = graphStruct->neighs = NULL;
 }
@@ -138,14 +123,6 @@ void Graph::copyToDevice(GraphStruct*& dest)
 }
 
 void Graph::randGraph(float prob, std::default_random_engine & eng, unsigned n) {
-	/*
-		if (useManagedMemory)
-		memsetGPU(n, string("nodes"));
-	else {
-		
-		graphStruct->neighIndex = new unsigned[n + 1] {};  // starts by zero
-	}
-	*/
 	
 	graphStruct->nodeCount = n;
 
@@ -170,11 +147,7 @@ void Graph::randGraph(float prob, std::default_random_engine & eng, unsigned n) 
 	for (int i = 0; i < n; i++)
 		index[i + 1] += index[i];
 
-	// manage memory for edges with CUDA Unified Memory
-	if (memoryEnum == ManagedAllocated)
-		AllocManaged();
-	else
-		AllocHost();
+	AllocHost();
 	
 	for (int i = 0; i < n; i++)
 	{
@@ -206,10 +179,7 @@ void Graph::BuildRandomDAG(Graph& dag)
 	// Init
 	dag.graphStruct->nodeCount = graphStruct->nodeCount;
 	dag.graphStruct->edgeCount = (graphStruct->edgeCount + 1) / 2;
-	if (dag.memoryEnum == ManagedAllocated)
-		dag.AllocManaged();
-	else
-		dag.AllocHost();
+	dag.AllocHost();
 	
 	// Create an array or random priorities
 	float* priorities = new float[graphStruct->nodeCount];
@@ -303,24 +273,10 @@ double Graph::GetAvgDeg()
 	return avgDeg;
 }
 
-
-
-void Graph::AllocManaged()
-{
-	CHECK(cudaMallocManaged(&(graphStruct->neighIndex), (graphStruct->nodeCount + 1) * sizeof(unsigned)));
-	CHECK(cudaMallocManaged(&(graphStruct->neighs), graphStruct->edgeCount * sizeof(unsigned)));
-}
-
-void Graph::FreeManaged()
-{
-	CHECK(cudaFree(graphStruct->neighIndex));
-	CHECK(cudaFree(graphStruct->neighs));
-}
-
 void Graph::AllocHost()
 {
 	graphStruct->neighs = new unsigned[graphStruct->edgeCount] {};
-	graphStruct->neighIndex = new unsigned[graphStruct->nodeCount + 1] {};  // starts by zero
+	graphStruct->neighIndex = new unsigned[graphStruct->nodeCount + 1] {};
 }
 
 void Graph::AllocDagOnDevice(GraphStruct* dag)

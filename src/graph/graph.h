@@ -15,20 +15,16 @@ struct GraphStruct {
 class Graph {
 	
 private:
+	GraphStruct* graphStruct{ nullptr };     // graph structure
 	float density{0.0f};	        // Probability of an edge (Erdos graph)
-	GraphStruct * graphStruct{nullptr};     // graph structure
 	unsigned maxDeg{0};
 	unsigned minDeg{0};
 	double avgDeg{0.0f};
 	bool connected{true};
-	void AllocManaged();                 // use UVA memory on CPU/GPU
-	void FreeManaged();
 	void AllocHost();
 
 public:
-	enum MemoryEnum { ManagedAllocated, HostAllocated } memoryEnum;
-
-	Graph(MemoryEnum);
+	Graph();
 	~Graph();
 	void Init();
 	void ReadFromMtxFile(const char* mtx);
