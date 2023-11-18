@@ -3,9 +3,6 @@
 #include "../utils/common.h"
 #include <random>
 
-/**
- * Base structure (array 1D format) of a graph
- */
 struct GraphStruct {
 	unsigned nodeCount{0};             // num of graph nodes
 	unsigned edgeCount{0};             // num of graph edges
@@ -13,19 +10,6 @@ struct GraphStruct {
 	unsigned* neighs{nullptr};           // list of neighbors for all nodes (edges)
 		
 	~GraphStruct() {delete[] neighs; delete[] neighIndex;}
-
-	// check whether node j is a neighbor of node i
-	bool isNeighbor(unsigned i, unsigned j) {
-		for (unsigned k = 0; k < deg(i); k++) 
-			if (neighs[neighIndex[i]+k] == j)
-	    	return true;
-	  return false;
-	}
-
-	// return the degree of node i
-	unsigned int deg(unsigned i) {
-		return(neighIndex[i+1]-neighIndex[i]);
-	}
 };
 
 class Graph {
@@ -46,7 +30,7 @@ public:
 
 	Graph(MemoryEnum);
 	~Graph();
-	void Init(); // CPU/GPU mem setup
+	void Init();
 	void ReadFromMtxFile(const char* mtx);
 	void copyToDevice(GraphStruct*& dest);
 	void randGraph(float, std::default_random_engine&, unsigned);  // generate an Erdos random graph
@@ -59,4 +43,8 @@ public:
 	uint GetNodeCount();
 	double GetAvgDeg();
 	void AllocDagOnDevice(GraphStruct*);
+
+	//utils
+	unsigned int deg(unsigned i);
+	bool isNeighbor(unsigned i, unsigned j);
 };

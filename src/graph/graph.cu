@@ -11,13 +11,6 @@
 
 using namespace std;
 
-/**
- * Generate an Erdos random graph
- * @param n number of nodes
- * @param density probability of an edge (expected density)
- * @param eng seed
- */
-
 Graph::Graph(MemoryEnum mem) {
 	memoryEnum = mem;
 	Init();
@@ -193,12 +186,12 @@ void Graph::randGraph(float prob, std::default_random_engine & eng, unsigned n) 
 	maxDeg = 0;
 	minDeg = n;
 	for (int i = 0; i < n; i++) {
-		if (graphStruct->deg(i) > maxDeg)
+		if (deg(i) > maxDeg)
 		{
-			maxDeg = graphStruct->deg(i);
+			maxDeg = deg(i);
 		}
-		if (graphStruct->deg(i) < minDeg)
-			minDeg = graphStruct->deg(i);
+		if (deg(i) < minDeg)
+			minDeg = deg(i);
 	}
 	density = (float)graphStruct->edgeCount / (float)(n * (n - 1));
 	avgDeg = (float)graphStruct->edgeCount / (float)n;
@@ -233,7 +226,7 @@ void Graph::BuildRandomDAG(Graph& dag)
 	for (int i = 0; i < graphStruct->nodeCount; ++i)
 	{
 		float priority = priorities[i];
-		int degree = graphStruct->deg(i);
+		int degree = deg(i);
 		for (int j = 0; j < degree; ++j)
 		{
 			unsigned int neighID = graphStruct->neighs[graphStruct->neighIndex[i] + j];
@@ -256,11 +249,11 @@ void Graph::BuildLDFDagV2(Graph& dag) //TODO: check all the code
 	int k = 0;
 	for (int i = 0; i < graphStruct->nodeCount; ++i)
 	{
-		int degree = graphStruct->deg(i);
+		int degree = deg(i);
 		for (int j = 0; j < degree; ++j)
 		{
 			unsigned int neighID = graphStruct->neighs[graphStruct->neighIndex[i] + j];
-			unsigned int neighDegree = graphStruct->deg(neighID);
+			unsigned int neighDegree = deg(neighID);
 			if (degree > neighDegree || (degree == neighDegree && i > neighID))
 			{
 				dag.graphStruct->neighs[k] = neighID;
@@ -278,11 +271,11 @@ void Graph::getLDFDag(GraphStruct* res)
 	int k = 0;
 	for (int i = 0; i < graphStruct->nodeCount; ++i)
 	{
-		int degree = graphStruct->deg(i);
+		int degree = deg(i);
 		for (int j = 0; j < degree; ++j)
 		{
 			unsigned int neighID = graphStruct->neighs[graphStruct->neighIndex[i] + j];
-			unsigned int neighDegree = graphStruct->deg(neighID);
+			unsigned int neighDegree = deg(neighID);
 			if (degree > neighDegree || (degree == neighDegree && i > neighID))
 			{
 				res->neighs[k] = neighID;
@@ -337,6 +330,19 @@ void Graph::AllocDagOnDevice(GraphStruct* dag)
 	dag->edgeCount = (graphStruct->edgeCount + 1) / 2;
 	CHECK(cudaMalloc((void**)&dag->neighIndex, (dag->nodeCount + 1) * sizeof(uint)));
 	CHECK(cudaMalloc((void**)&dag->neighs, dag->edgeCount * sizeof(uint)));
+}
+
+unsigned int Graph::deg(unsigned i)
+{
+	return(graphStruct->neighIndex[i + 1] - graphStruct->neighIndex[i]);
+}
+
+bool Graph::isNeighbor(unsigned i, unsigned j)
+{
+	for (unsigned k = 0; k < deg(i); k++)
+		if (graphStruct->neighs[graphStruct->neighIndex[i] + k] == j)
+			return true;
+	return false;
 }
 
 /**
