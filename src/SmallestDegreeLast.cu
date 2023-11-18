@@ -99,12 +99,9 @@ Coloring* SmallestDegreeLast::color(Graph& graph)
 	dim3 blockDim(THREADxBLOCK);
 	dim3 gridDim((n + blockDim.x - 1) / blockDim.x, 1, 1);
 	uint* inboundCounts;
-	uint* outboundCounts;
 	CHECK(cudaMalloc((void**)&inboundCounts, n * sizeof(uint)));
-	CHECK(cudaMalloc((void**)&outboundCounts, n * sizeof(uint)));
 	cudaMemset(inboundCounts, 0, n * sizeof(uint));
-	cudaMemset(outboundCounts, 0, n * sizeof(uint));
-	calculateInbounds << <gridDim, blockDim >> > (d_graphStruct, inboundCounts, d_priorities, n, outboundCounts);
+	calculateInbounds << <gridDim, blockDim >> > (d_graphStruct, inboundCounts, d_priorities, n);
 	cudaDeviceSynchronize();
 
 	// inizialize bitmaps, every node has a bitmap with a length of inbound edges + 1 TODO: alloc on gpu

@@ -4,7 +4,6 @@
 #include "graph/graph_d.h"
 #include "utils/common.h"
 #include <cooperative_groups.h>
-
 #include "colorer.h"
 
 
@@ -159,7 +158,7 @@ void mallocOnHost(Coloring* coloring, unsigned n)
 }
 
 //TODO: evita atomic add facendo il confronto al contrario
-__global__ void calculateInbounds(GraphStruct* graphStruct, unsigned int* inboundCounts, unsigned int* priorities, int n, unsigned int* outboundCounts) {
+__global__ void calculateInbounds(GraphStruct* graphStruct, unsigned int* inboundCounts, unsigned int* priorities, int n) {
 	uint idx = blockIdx.x * blockDim.x + threadIdx.x;
 	if (idx >= n)
 		return;
@@ -174,13 +173,11 @@ __global__ void calculateInbounds(GraphStruct* graphStruct, unsigned int* inboun
 		if (priorities[idx] > priorities[neighID])
 		{
 			atomicAdd(&inboundCounts[neighID], 1);
-			atomicAdd(&outboundCounts[idx], 1);
 			//printf(" atomicAdd node(%d -> %d [count: %d] \n", idx, neighID, inboundCounts[neighID]);
 		}
 		else if (priorities[idx] == priorities[neighID] && idx > neighID)
 		{
 			atomicAdd(&inboundCounts[neighID], 1);
-			atomicAdd(&outboundCounts[idx], 1);
 			//printf(" atomicAdd node(%d -> %d [count: %d] \n", idx, neighID, inboundCounts[neighID]);
 		}
 	}
@@ -476,7 +473,7 @@ Coloring* DegreePriorityColoringV3(Graph& graph, priorityEnum priorityEnum)
 	CHECK(cudaMalloc((void**)&outboundCounts, n * sizeof(uint)));
 	cudaMemset(inboundCounts, 0, n * sizeof(uint));
 	cudaMemset(outboundCounts, 0, n * sizeof(uint));
-	calculateInbounds <<<gridDim, blockDim >>> (d_graphStruct, inboundCounts, d_priorities, n, outboundCounts);
+	calculateInbounds <<<gridDim, blockDim >>> (d_graphStruct, inboundCounts, d_priorities, n);
 	cudaDeviceSynchronize();
 
 	// inizialize bitmaps, every node has a bitmap with a length of inbound edges + 1 TODO: alloc on gpu
@@ -655,42 +652,3 @@ __global__ void applyBufferWithInboundCountersBitmaps(uint* coloring, bool* colo
 	filledBuffer[idx] = false;
 	//printf("buffer applied: from %d, color: %d\n", idx, coloring[idx]);
 }
-
-__global__ void testAtomicAdd(GraphStruct* graphStruct, unsigned* priorities, unsigned* inboundCounts)
-{
-	uint idx = threadIdx.x + blockDim.x * blockIdx.x;
-
-	if (idx >= graphStruct->nodeCount)
-		return;
-
-	uint offset = graphStruct->neighIndex[idx];
-	uint deg = graphStruct->neighIndex[idx + 1] - graphStruct->neighIndex[idx];
-
-	for (uint i = 0; i < deg; i++)
-	{
-		uint neighID = graphStruct->neighs[offset + i];
-
-		if (priorities[idx] > priorities[neighID])
-		{
-			atomicAdd(&inboundCounts[neighID], -1);
-
-			//if (neighID == 8984)
-				//printf("I'm: %d, removed arc to: %d: \n", idx, neighID);
-			//printf("I'm: %d, removed arc to: %d: \n", idx, neighID);
-		}
-		else if (priorities[idx] == priorities[neighID] && idx > neighID)
-		{
-			atomicAdd(&inboundCounts[neighID], -1);
-
-			//if (neighID == 8984)
-			//	printf("I'm: %d, removed arc to: %d: \n", idx, neighID);
-		}
-
-	}
-
-}
-
-
-
-
-

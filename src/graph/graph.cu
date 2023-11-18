@@ -5,9 +5,9 @@
 #include <fstream>
 #include <string>
 #include <set>
-
 #include "graph.h"
 #include "../utils/common.h"
+#include <curand_kernel.h>
 
 using namespace std;
 
@@ -18,6 +18,12 @@ Graph::Graph() {
 Graph::~Graph()
 {
 	delete graphStruct;
+	if (deviceAllocated)
+	{
+		cudaFree(neighIndexTemp);
+		cudaFree(neighsTemp);
+		cudaFree(d_graphStruct);
+	}
 }
 
 void Graph::Init() {
@@ -108,18 +114,22 @@ void Graph::ReadFromMtxFile(const char* mtx) {
 
 void Graph::copyToDevice(GraphStruct*& dest)
 {
-	CHECK(cudaMalloc((void**)&dest, sizeof(GraphStruct)));
-	CHECK(cudaMemcpy(&dest->nodeCount, &graphStruct->nodeCount, sizeof(int), cudaMemcpyHostToDevice));
-	CHECK(cudaMemcpy(&dest->edgeCount, &graphStruct->edgeCount, sizeof(int), cudaMemcpyHostToDevice));
+	if (!deviceAllocated)
+	{
+		deviceAllocated = true;
+		CHECK(cudaMalloc((void**)&d_graphStruct, sizeof(GraphStruct)));
+		CHECK(cudaMemcpy(&d_graphStruct->nodeCount, &graphStruct->nodeCount, sizeof(int), cudaMemcpyHostToDevice));
+		CHECK(cudaMemcpy(&d_graphStruct->edgeCount, &graphStruct->edgeCount, sizeof(int), cudaMemcpyHostToDevice));
 
-	uint* neighIndexTemp;
-	uint* neighsTemp;
-	CHECK(cudaMalloc((void**)&neighIndexTemp, (graphStruct->nodeCount + 1) * sizeof(uint)));
-	CHECK(cudaMalloc((void**)&neighsTemp, graphStruct->edgeCount * sizeof(uint)));
-	CHECK(cudaMemcpy(&(dest->neighIndex), &(neighIndexTemp), sizeof(uint*), cudaMemcpyHostToDevice));
-	CHECK(cudaMemcpy(&(dest->neighs), &(neighsTemp), sizeof(uint*), cudaMemcpyHostToDevice));
-	CHECK(cudaMemcpy(neighIndexTemp, graphStruct->neighIndex, (graphStruct->nodeCount + 1) * sizeof(uint), cudaMemcpyHostToDevice));
-	CHECK(cudaMemcpy(neighsTemp, graphStruct->neighs, graphStruct->edgeCount * sizeof(uint), cudaMemcpyHostToDevice));
+		
+		CHECK(cudaMalloc((void**)&neighIndexTemp, (graphStruct->nodeCount + 1) * sizeof(uint)));
+		CHECK(cudaMalloc((void**)&neighsTemp, graphStruct->edgeCount * sizeof(uint)));
+		CHECK(cudaMemcpy(&(d_graphStruct->neighIndex), &(neighIndexTemp), sizeof(uint*), cudaMemcpyHostToDevice));
+		CHECK(cudaMemcpy(&(d_graphStruct->neighs), &(neighsTemp), sizeof(uint*), cudaMemcpyHostToDevice));
+		CHECK(cudaMemcpy(neighIndexTemp, graphStruct->neighIndex, (graphStruct->nodeCount + 1) * sizeof(uint), cudaMemcpyHostToDevice));
+		CHECK(cudaMemcpy(neighsTemp, graphStruct->neighs, graphStruct->edgeCount * sizeof(uint), cudaMemcpyHostToDevice));
+	}
+	dest = d_graphStruct;
 }
 
 void Graph::randGraph(float prob, std::default_random_engine & eng, unsigned n) {

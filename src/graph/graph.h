@@ -16,12 +16,16 @@ class Graph {
 	
 private:
 	GraphStruct* graphStruct{ nullptr };     // graph structure
-	float density{0.0f};	        // Probability of an edge (Erdos graph)
+	GraphStruct* d_graphStruct{ nullptr };
+	uint* neighIndexTemp{ nullptr }; // pointer to call cudaFree
+	uint* neighsTemp{ nullptr }; // pointer to call cudaFree
+	float density{0.0f};
 	unsigned maxDeg{0};
 	unsigned minDeg{0};
 	double avgDeg{0.0f};
 	bool connected{true};
 	void AllocHost();
+	bool deviceAllocated{ false };
 
 public:
 	Graph();
@@ -30,14 +34,14 @@ public:
 	void ReadFromMtxFile(const char* mtx);
 	void copyToDevice(GraphStruct*& dest);
 	void randGraph(float, std::default_random_engine&, unsigned);  // generate an Erdos random graph
-	void BuildRandomDAG(Graph&);
 	void print(bool);
 	GraphStruct* getStruct() {return graphStruct;}
-	void getLDFDag(GraphStruct*);
-	void BuildLDFDagV2(Graph&);
 	int GetEdgeCount();
 	uint GetNodeCount();
 	double GetAvgDeg();
+	void BuildRandomDAG(Graph&);
+	void getLDFDag(GraphStruct*);
+	void BuildLDFDagV2(Graph&);
 	void AllocDagOnDevice(GraphStruct*);
 
 	//utils
