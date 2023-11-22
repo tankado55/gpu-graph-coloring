@@ -280,3 +280,74 @@ void test(Graph& graph)
 	}
 	std::cout << "end" << std::endl;
 }
+
+Coloring* SequentialColorer::color(Graph& graph)
+{
+	// DAG
+	Graph dag;
+	m_Graph->BuildRandomDAG(dag);
+
+	// temp data inizialization
+	uint bitCount = (m_GraphStruct->nodeCount + (int)(m_GraphStruct->edgeCount + 1) / 2);
+	std::vector<bool> bitmaps(bitCount, true);
+	std::vector<uint> bitmapIndex(m_GraphStruct->nodeCount + 1);
+	std::vector<uint> inboundCounts(m_GraphStruct->nodeCount, 0);
+	GraphStruct* dagStruct = dag.getStruct();
+	for (int i = 0; i < dag.GetEdgeCount(); ++i)
+		inboundCounts[dagStruct->neighs[i]]++;
+	for (int i = 1; i < m_GraphStruct->nodeCount + 1; i++)
+		bitmapIndex[i] = bitmapIndex[i - 1] + m_InboundCounts[i - 1] + 1;
+
+	// JP Coloring
+	m_Coloring->iterationCount = 0;
+	while (m_Coloring->uncoloredFlag)
+	{
+		m_Coloring->uncoloredFlag = false;
+		for (int i = 0; i < m_GraphStruct->nodeCount; ++i)
+		{
+			if (m_Coloring->coloring[i])
+				continue;
+
+			uint offset = dagStruct->neighIndex[i];
+			uint deg = dagStruct->neighIndex[i + 1] - dagStruct->neighIndex[i];
+
+			if (inboundCounts[i] == 0) // Ready node
+			{
+				int colorCount = bitmapIndex[i + 1] - bitmapIndex[i];
+				printf("I'm %d, total colors: %d\n", i, colorCount);
+
+				int bestColor = colorCount;
+				for (int j = 0; j < colorCount; ++j)
+				{
+					if (bitmaps[bitmapIndex[i] + j])
+					{
+						if (j < bestColor)
+						{
+							//TODO: find another way
+							bestColor = j;
+							break;
+						}
+					}
+				}
+				m_Coloring->coloring[i] = bestColor;
+				m_Coloring->coloredNodes[i] = true;
+				printf("colored: %d, best color: %d: \n", i, m_Coloring->coloring[i]);
+				if (bestColor > m_Coloring->iterationCount)
+				{
+					m_Coloring->iterationCount = bestColor; // possibile race, potrei computarlo nella print
+				}
+				for (uint j = 0; j < deg; j++) {
+					uint neighID = dagStruct->neighs[offset + j];
+					inboundCounts[neighID]--;
+					bitmaps[bitmapIndex[neighID] + bestColor] = 0;
+
+				}
+			}
+			else
+			{
+				m_Coloring->uncoloredFlag = true;
+			}
+		}
+	}
+	return m_Coloring;
+}

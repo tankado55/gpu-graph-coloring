@@ -55,5 +55,13 @@
     <ClInclude Include="src\utils\MyDebug.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\SequentialGreedyColorer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\SequentialGreedyColorer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

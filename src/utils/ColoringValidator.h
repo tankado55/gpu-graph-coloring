@@ -10,7 +10,7 @@ void validateColoring(Coloring* coloring, GraphStruct* graph)
 	for (int i = 0; i < n; ++i)
 	{
 		int offset = graph->neighIndex[i];
-		int deg = graph->neighIndex[i] - graph->neighIndex[i + 1];
+		int deg = graph->neighIndex[i + 1] - graph->neighIndex[i];
 		int color = coloring->coloring[i];
 		
 		if (color > maxColor)

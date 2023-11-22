@@ -32,7 +32,6 @@ private:
 public:
 	Colorer(Graph*);
 	Coloring* LDFColoring();
-	Coloring* RandomPriorityColoringCPUSequential();
 	~Colorer();
 };
 

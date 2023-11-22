@@ -7,6 +7,7 @@
 #include "IncidenceColorer.h"
 #include "SaturationColorer.h"
 #include "SmallestDegreeLast.h"
+#include "SequentialGreedyColorer.h"
 
 int main(void) {
 	// Random generated graph
@@ -38,7 +39,8 @@ int main(void) {
 	//Coloring* coloring = DegreePriorityColoringV3(graph, priorityEnum);              // bitmaps 20k 0.018 1.029sec/0.914sec
 	//Coloring* coloring = IncidenceColorer::color(graph);
 	//Coloring* coloring = SaturationColorer::color(graph);
-	Coloring* coloring = SmallestDegreeLast::color(graph);
+	//Coloring* coloring = SmallestDegreeLast::color(graph);
+	Coloring* coloring = SequentialGreedyColorer::color(graph);
 	//test(graph);
 
 	
@@ -47,6 +49,6 @@ int main(void) {
 	std::cout << "Iterations: " << coloring->iterationCount << std::endl;
 
 	validateColoring(coloring, graphStruct);
-
+	free(coloring->coloring);
 	return EXIT_SUCCESS;
 }

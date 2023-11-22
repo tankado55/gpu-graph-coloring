@@ -113,6 +113,7 @@
     <CudaCompile>
       <GenerateRelocatableDeviceCode>true</GenerateRelocatableDeviceCode>
       <CodeGeneration>compute_60,sm_60</CodeGeneration>
+      <Include>%(Include)</Include>
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -132,6 +133,7 @@
     </Link>
     <CudaCompile>
       <CodeGeneration>compute_60,sm_60</CodeGeneration>
+      <Include>%(Include)</Include>
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -151,6 +153,7 @@
     <ClInclude Include="src\Colorer.h" />
     <ClInclude Include="src\IncidenceColorer.h" />
     <ClInclude Include="src\SaturationColorer.h" />
+    <ClInclude Include="src\SequentialGreedyColorer.h" />
     <ClInclude Include="src\SmallestDegreeLast.h" />
     <ClInclude Include="src\utils\ColoringValidator.h" />
     <ClInclude Include="src\utils\common.h" />
@@ -162,6 +165,9 @@
     <CudaCompile Include="src\graph\graph.cu">
       <FileType>Document</FileType>
     </CudaCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\SequentialGreedyColorer.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
