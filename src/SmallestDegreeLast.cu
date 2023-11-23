@@ -3,7 +3,7 @@
 #include "utils/common.h"
 #include "utils/MyDebug.h"
 
-__global__ void assignPriority(uint* priorities, GraphStruct* graphStruct, double avgDeg, uint priority, int* remainingCount, int* sumDeg)
+__global__ void assignPrioritySmallestDesgreeLast(uint* priorities, GraphStruct* graphStruct, double avgDeg, uint priority, int* remainingCount, int* sumDeg)
 {
     uint idx = threadIdx.x + blockDim.x * blockIdx.x;
 	if (idx >= graphStruct->nodeCount)
@@ -32,6 +32,7 @@ __global__ void assignPriority(uint* priorities, GraphStruct* graphStruct, doubl
     }
 }
 
+
 uint* SmallestDegreeLast::calculatePriority(Graph& graph, GraphStruct* d_graphStruct)
 {
     int n = graph.GetNodeCount();
@@ -59,7 +60,7 @@ uint* SmallestDegreeLast::calculatePriority(Graph& graph, GraphStruct* d_graphSt
 		while (true)
 		{
 			int prevRemainingCount = *remainingCount;
-			assignPriority << <gridDim, blockDim >> > (d_priorities, d_graphStruct, avgDeg, i, remainingCount, sumDeg);
+			assignPrioritySmallestDesgreeLast << <gridDim, blockDim >> > (d_priorities, d_graphStruct, avgDeg, i, remainingCount, sumDeg);
 			cudaDeviceSynchronize();
 			if (prevRemainingCount == *remainingCount)
 				break;

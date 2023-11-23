@@ -2,6 +2,11 @@
 #include <vector>
 #include <iostream>
 
+uint* SequentialGreedyColorer::calculatePriority(Graph& graph, GraphStruct* d_graphStruct)
+{
+	return nullptr;
+}
+
 Coloring* SequentialGreedyColorer::color(Graph& graph)
 {
 	double start = seconds();

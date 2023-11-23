@@ -83,13 +83,6 @@ __global__ void applyBufferSaturation(uint* coloring, bool* isColored, GraphStru
 		{
 			bitmaps[bitmapIndex[neighID] + buffer[idx]] = 0;
 		}
-		else {
-			//atomicAdd(&priorities[neighID], 1);
-		}
-
-		/*if (idx == 3 && neighID == 114) {
-			printf("id: %d, %d, color: %d, neigh color count: %d\n", idx, neighID, buffer[idx], neighColorCount);
-		}*/
 	}
 	/*if (idx == 3 || idx == 114) {
 		printf("id: %d, buffer applied, color: %d, colorCount: %d, Degree: %d\n", idx, coloring[idx], bitmapIndex[idx + 1] - bitmapIndex[idx], graphStruct->neighIndex[idx + 1] - graphStruct->neighIndex[idx]);

@@ -637,3 +637,59 @@ Coloring* DegreePriorityColoringV3(Graph& graph, priorityEnum priorityEnum)
 	coloringStruct->iterationCount = iterationCount;
 	return coloringStruct;
 }
+
+__global__ void applyBuffer(Coloring* coloring, unsigned* buffer, bool* filledBuffer, unsigned n)
+{
+	uint idx = threadIdx.x + blockDim.x * blockIdx.x;
+
+	if (idx >= n)
+		return;
+
+	if (coloring->coloredNodes[idx])
+		return;
+
+	if (!filledBuffer[idx])
+		return;
+
+	coloring->coloring[idx] = buffer[idx];
+	coloring->coloredNodes[idx] = true;
+	filledBuffer[idx] = false;
+	//printf("buffer applied: %d, color: %d\n", idx, coloring->coloring[idx]);
+
+}
+
+__global__ void applyBufferWithInboundCounters(Coloring* coloring, GraphStruct* graphStruct, unsigned* priorities, unsigned* inboundCounts, unsigned* buffer, bool* filledBuffer)
+{
+	uint idx = threadIdx.x + blockDim.x * blockIdx.x;
+
+	if (idx >= graphStruct->nodeCount)
+		return;
+
+	if (coloring->coloredNodes[idx])
+		return;
+
+	if (!filledBuffer[idx])
+		return;
+
+	uint offset = graphStruct->neighIndex[idx];
+	uint deg = graphStruct->neighIndex[idx + 1] - graphStruct->neighIndex[idx];
+
+	for (uint i = 0; i < deg; i++)
+	{
+		uint neighID = graphStruct->neighs[offset + i];
+		if (!coloring->coloredNodes[neighID] &&
+			((priorities[idx] > priorities[neighID]) || ((priorities[idx] == priorities[neighID]) && idx > neighID)))
+		{
+			atomicAdd(&inboundCounts[neighID], -1);
+			//if (neighID == 750)
+			//	printf("I'm: %d, removed arc to: %d: \n", idx, neighID);
+		}
+		//printf("I'm: %d, removed arc to: %d: \n", idx, neighID);
+
+	}
+	coloring->coloring[idx] = buffer[idx];
+	coloring->coloredNodes[idx] = true;
+	filledBuffer[idx] = false;
+	//printf("buffer applied: %d, color: %d\n", idx, coloring->coloring[idx]);
+
+}

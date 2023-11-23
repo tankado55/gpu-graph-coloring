@@ -15,19 +15,15 @@ struct Coloring {
 
 class Colorer
 {
+private:
+	virtual uint* calculatePriority(Graph& graph, GraphStruct* d_graphStruct) = 0;
 public:
-	Coloring* LDFColoring();
+	Coloring* color(Graph& graph);
+	virtual ~Colorer();
 };
 
-Coloring* RandomPriorityColoring(Graph& graph);
-
-void test(Graph& graph);
-Coloring* RandomPriorityColoringV2(Graph& graph);
-Coloring* RandomPriorityColoringV3(Graph& graph);
 void printColoring(Coloring*, GraphStruct*, bool);
-__global__ void InitRandomPriorities(uint seed, curandState_t*, uint*, uint);
-__global__ void colorIS(Coloring*, GraphStruct*, uint*);
 __global__ void print_d(GraphStruct*, bool);
-__global__ void applyBufferWithInboundCountersBitmaps(uint*, bool*, GraphStruct*, unsigned*, unsigned*, unsigned*, bool*, bool*, uint*);
-__global__ void colorWithInboundCountersBitmaps(uint*, bool*, GraphStruct*, uint*, uint*, bool*, bool*, uint*, bool*);
 __global__ void calculateInbounds(GraphStruct* graphStruct, unsigned int* inboundCounts, unsigned int* priorities, int n);
+__global__ void colorWithInboundCountersBitmaps(uint*, bool*, GraphStruct*, uint*, uint*, bool*, bool*, uint*, bool*);
+__global__ void applyBufferWithInboundCountersBitmaps(uint*, bool*, GraphStruct*, unsigned*, unsigned*, unsigned*, bool*, bool*, uint*);

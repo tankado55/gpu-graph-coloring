@@ -5,7 +5,7 @@
 #include <cooperative_groups.h>
 
 __global__ void colorIncidence(bool* isColored, GraphStruct* graphStruct, uint* buffer, bool* filledBuffer, bool* bitmaps, uint* bitmapIndex, uint* priorities, bool* uncoloredFlag)
-{//d_coloredNodes, d_graphStruct, buffer, filledBuffer, bitmaps, bitmapIndex, d_priorities, d_uncoloredFlag
+{
 	uint idx = threadIdx.x + blockDim.x * blockIdx.x;
 
 	if (idx >= graphStruct->nodeCount)
@@ -81,9 +81,7 @@ __global__ void applyBufferIncidence(uint* coloring, bool* isColored, GraphStruc
 		int neighColorCount = bitmapIndex[neighID + 1] - bitmapIndex[neighID];
 		if (buffer[idx] < neighColorCount)
 			bitmaps[bitmapIndex[neighID] + buffer[idx]] = 0;
-		/*if (idx == 3 && neighID == 114) {
-			printf("id: %d, %d, color: %d, neigh color count: %d\n", idx, neighID, buffer[idx], neighColorCount);
-		}*/
+		
 	}
 	/*if (idx == 3 || idx == 114) {
 		printf("id: %d, buffer applied, color: %d, colorCount: %d, Degree: %d\n", idx, coloring[idx], bitmapIndex[idx + 1] - bitmapIndex[idx], graphStruct->neighIndex[idx + 1] - graphStruct->neighIndex[idx]);

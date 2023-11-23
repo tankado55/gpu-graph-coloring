@@ -1,8 +1,10 @@
 #pragma once
 #include "Colorer.h"
 
-class SequentialGreedyColorer : Colorer
+class SequentialGreedyColorer : public Colorer
 {
+private:
+	uint* calculatePriority(Graph& graph, GraphStruct* d_graphStruct) override;
 public:
-	static Coloring* color(Graph& graph);
+	Coloring* color(Graph& graph);
 };

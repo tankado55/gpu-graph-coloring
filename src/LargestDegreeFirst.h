@@ -2,12 +2,10 @@
 
 #include "Colorer.h"
 
-class LargestDegreeFirst : Colorer
+class LargestDegreeFirst : public Colorer
 {
 
 private:
-	static uint* calculatePriority(Graph& graph, GraphStruct* d_graphStruct);
+	uint* calculatePriority(Graph& graph, GraphStruct* d_graphStruct);
 
-public:
-	static Coloring* color(Graph& graph);
 };
