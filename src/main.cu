@@ -8,6 +8,7 @@
 #include "SaturationColorer.h"
 #include "SmallestDegreeLast.h"
 #include "SequentialGreedyColorer.h"
+#include "RandomPriorityColorer.h"
 
 int main(void) {
 	// Random generated graph
@@ -35,12 +36,12 @@ int main(void) {
 	//Coloring* coloring = RandomPriorityColoring(graph);     // 0.375 20k 1.509 no inbound
 	//Coloring* coloring = RandomPriorityColoringV2(graph); // 0.352     20k 1.424 con inbounds 0.97 msi
 	//Coloring* coloring = RandomPriorityColoringV3(graph);
-	priorityEnum priorityEnum = LDF;
 	//Coloring* coloring = DegreePriorityColoringV3(graph, priorityEnum);              // bitmaps 20k 0.018 1.029sec/0.914sec
 	//Coloring* coloring = IncidenceColorer::color(graph);
 	//Coloring* coloring = SaturationColorer::color(graph);
 	//Coloring* coloring = SmallestDegreeLast::color(graph);
 	Coloring* coloring = SequentialGreedyColorer::color(graph);
+	//Coloring* coloring = RandomPriorityColorer::color(graph);
 	//test(graph);
 
 	

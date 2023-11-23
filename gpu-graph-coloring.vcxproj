@@ -139,12 +139,14 @@
   <ItemGroup>
     <CudaCompile Include="src\Colorer.cu" />
     <CudaCompile Include="src\IncidenceColorer.cu" />
+    <CudaCompile Include="src\LargestDegreeFirst.cu" />
     <CudaCompile Include="src\old\OldColorer.cu">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </CudaCompile>
     <CudaCompile Include="src\main.cu" />
     <CudaCompile Include="src\graph\graph_d.cu" />
+    <CudaCompile Include="src\RandomPriorityColorer.cu" />
     <CudaCompile Include="src\SaturationColorer.cu" />
     <CudaCompile Include="src\SmallestDegreeLast.cu" />
     <CudaCompile Include="src\utils\MyDebug.cu" />
@@ -152,6 +154,8 @@
   <ItemGroup>
     <ClInclude Include="src\Colorer.h" />
     <ClInclude Include="src\IncidenceColorer.h" />
+    <ClInclude Include="src\LargestDegreeFirst.h" />
+    <ClInclude Include="src\RandomPriorityColorer.h" />
     <ClInclude Include="src\SaturationColorer.h" />
     <ClInclude Include="src\SequentialGreedyColorer.h" />
     <ClInclude Include="src\SmallestDegreeLast.h" />

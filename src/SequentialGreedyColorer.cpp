@@ -57,5 +57,6 @@ Coloring* SequentialGreedyColorer::color(Graph& graph)
 	coloringStruct->iterationCount = n;
 	stop = seconds();
 	std::cout << "Processing: " << elapsedTime(start, stop) << std::endl;
+	free(coloredNodes);
 	return coloringStruct;
 }

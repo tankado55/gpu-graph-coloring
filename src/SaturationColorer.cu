@@ -5,7 +5,7 @@
 #include <cooperative_groups.h>
 
 __global__ void colorSaturation(bool* isColored, GraphStruct* graphStruct, uint* buffer, bool* filledBuffer, bool* bitmaps, uint* bitmapIndex, uint* priorities, bool* uncoloredFlag)
-{//d_coloredNodes, d_graphStruct, buffer, filledBuffer, bitmaps, bitmapIndex, d_priorities, d_uncoloredFlag
+{
 	uint idx = threadIdx.x + blockDim.x * blockIdx.x;
 
 	if (idx >= graphStruct->nodeCount)
