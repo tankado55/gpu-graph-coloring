@@ -17,14 +17,13 @@ int main(int argc, char* argv[]) {
 	//float prob = .018;				    // density (percentage) for random graphs
 	//std::default_random_engine engine{ 0 };  // fixed seed
 	//graph.randGraph(prob, engine, n);
+
 	const char* path;
 	int mod;
-	
-	
 
 	if (argc < 3) {
 		path = "inputData/soc-youtube-snap/soc-youtube-snap.mtx";
-		mod = 1;
+		mod = 2;
 	}
 	else
 	{
@@ -39,38 +38,34 @@ int main(int argc, char* argv[]) {
 	printf("start, edgeCount: %d\n", graphStruct->edgeCount);
 	printf("start, nodeCount: %d\n", graphStruct->nodeCount);
 
+	Coloring* coloring;
 	switch (mod)
 	{
 	case 1:
-		SequentialGreedyColorer colorer;
+		coloring = SequentialGreedyColorer::color(graph);
+		break;
+	case 2:
+		coloring = RandomPriorityColorer::color(graph);
+		break;
+	case 3:
+		coloring = LargestDegreeFirst::color(graph);
+		break;
+	case 4:
+		coloring = SmallestDegreeLast::color(graph);
+		break;
+	case 5:
+		coloring = SaturationColorer::color(graph);
+		break;
+	case 6:
+		coloring = IncidenceColorer::color(graph);
 		break;
 	default:
 		break;
 	}
 
-	
-
-	
-	//Colorer colorer(&graph);
-	//Coloring* coloring = RandomPriorityColoring(graph);     // 0.375 20k 1.509 no inbound
-	//Coloring* coloring = RandomPriorityColoringV2(graph); // 0.352     20k 1.424 con inbounds 0.97 msi
-	//Coloring* coloring = RandomPriorityColoringV3(graph);
-	//Coloring* coloring = DegreePriorityColoringV3(graph, priorityEnum);              // bitmaps 20k 0.018 1.029sec/0.914sec
-	//Coloring* coloring = IncidenceColorer::color(graph);
-	//Coloring* coloring = SaturationColorer::color(graph);
-	//LargestDegreeFirst colorer; //TODO virtual destructor
-	Coloring* coloring = colorer->color(graph);
-	//Coloring* coloring = SequentialGreedyColorer::color(graph);
-	//Coloring* coloring = RandomPriorityColorer::color(graph);
-	//test(graph);
-
-	
-
-	//printColoring(coloring, graphStruct, 1);
 	std::cout << "Iterations: " << coloring->iterationCount << std::endl;
-
 	validateColoring(coloring, graphStruct);
+
 	free(coloring->coloring);
-	free(colorer);
 	return EXIT_SUCCESS;
 }

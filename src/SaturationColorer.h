@@ -1,8 +1,11 @@
 #pragma once
 #include "Colorer.h"
 
-class SaturationColorer : public Colorer
+__global__ void applyBufferSaturation(uint* coloring, bool* isColored, GraphStruct* graphStruct, uint* buffer,
+	bool* filledBuffer, uint* priorities, bool* bitmaps, uint* bitmapIndex, unsigned n);
+__global__ void updatePriorities(bool* isColored, GraphStruct* graphStruct, uint* priorities, bool* bitmaps, uint* bitmapIndex, unsigned n);
+
+namespace SaturationColorer
 {
-public:
-	static Coloring* color(Graph& graph);
+	Coloring* color(Graph& graph);
 };

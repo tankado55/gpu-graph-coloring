@@ -13,17 +13,14 @@ struct Coloring {
 	bool* coloredNodes;
 };
 
-class Colorer
-{
-private:
-	virtual uint* calculatePriority(Graph& graph, GraphStruct* d_graphStruct) = 0;
-public:
-	Coloring* color(Graph& graph);
-	virtual ~Colorer();
-};
-
 void printColoring(Coloring*, GraphStruct*, bool);
 __global__ void print_d(GraphStruct*, bool);
 __global__ void calculateInbounds(GraphStruct* graphStruct, unsigned int* inboundCounts, unsigned int* priorities, int n);
 __global__ void colorWithInboundCountersBitmaps(uint*, bool*, GraphStruct*, uint*, uint*, bool*, bool*, uint*, bool*);
 __global__ void applyBufferWithInboundCountersBitmaps(uint*, bool*, GraphStruct*, unsigned*, unsigned*, unsigned*, bool*, bool*, uint*);
+__global__ void colorWithoutInbounds(bool* isColored, GraphStruct* graphStruct, uint* buffer, bool* filledBuffer, bool* bitmaps, uint* bitmapIndex, uint* priorities, bool* uncoloredFlag);
+
+namespace global
+{
+	Coloring* color(Graph& graph, uint* d_priorities);
+};

@@ -149,7 +149,6 @@
     <CudaCompile Include="src\RandomPriorityColorer.cu" />
     <CudaCompile Include="src\SaturationColorer.cu" />
     <CudaCompile Include="src\SmallestDegreeLast.cu" />
-    <CudaCompile Include="src\utils\MyDebug.cu" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Colorer.h" />
@@ -163,7 +162,6 @@
     <ClInclude Include="src\utils\common.h" />
     <ClInclude Include="src\graph\graph.h" />
     <ClInclude Include="src\graph\graph_d.h" />
-    <ClInclude Include="src\utils\MyDebug.h" />
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="src\graph\graph.cu">

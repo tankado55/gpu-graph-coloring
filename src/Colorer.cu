@@ -68,10 +68,6 @@ __global__ void colorWithInboundCountersBitmaps(uint* coloring, bool* coloredNod
 	else
 	{
 		*uncoloredFlag = true;
-		//if (idx == 0)
-		//{
-		//	printf("GPU - I'm %d, flag true, still: %d\n", idx, inboundCounts[idx]);
-		//}
 	}
 }
 
@@ -101,11 +97,6 @@ __global__ void applyBufferWithInboundCountersBitmaps(uint* coloring, bool* colo
 			int colorCount = bitmapIndex[neighID + 1] - bitmapIndex[neighID];
 			if (buffer[idx] < colorCount)
 				bitmaps[bitmapIndex[neighID] + buffer[idx]] = 0;
-
-			//if (neighID == 18836) {
-			//	printf("I'm: %d, ---------removed arc to: %d, still: %d\n", idx, neighID, inboundCounts[neighID]);
-			//	printf("%d, %d, %d, %d, %d\n", bitmaps[bitmapIndex[neighID] + 0], bitmaps[bitmapIndex[neighID] + 1], bitmaps[bitmapIndex[neighID] + 2], bitmaps[bitmapIndex[neighID] + 3], bitmaps[bitmapIndex[neighID] + 4]);
-			//}
 		}
 		else if (priorities[idx] == priorities[neighID] && idx > neighID)
 		{
@@ -134,6 +125,54 @@ __global__ void applyBufferWithInboundCountersBitmaps(uint* coloring, bool* colo
 	//printf("buffer applied: from %d, color: %d\n", idx, coloring[idx]);
 }
 
+__global__ void colorWithoutInbounds(bool* isColored, GraphStruct* graphStruct, uint* buffer, bool* filledBuffer, bool* bitmaps, uint* bitmapIndex, uint* priorities, bool* uncoloredFlag)
+{
+	uint idx = threadIdx.x + blockDim.x * blockIdx.x;
+
+	if (idx >= graphStruct->nodeCount)
+		return;
+
+	if (isColored[idx])
+		return;
+
+	uint offset = graphStruct->neighIndex[idx];
+	uint deg = graphStruct->neighIndex[idx + 1] - graphStruct->neighIndex[idx];
+	/*if (idx == 3 || idx == 114) {
+		printf("id: %d, priority: %d\n", idx, priorities[idx]);
+	}*/
+
+	bool candidate = true;
+	for (uint j = 0; j < deg; j++) {
+		uint neighID = graphStruct->neighs[offset + j];
+
+		if (!isColored[neighID] &&
+			((priorities[idx] < priorities[neighID]) || ((priorities[idx] == priorities[neighID]) && idx < neighID))) {
+			candidate = false;
+		}
+	}
+	if (candidate) {
+		/*if (idx == 3 || idx == 114) {
+			printf("id: %d, CANDIDATE\n", idx);
+		}*/
+		int colorCount = bitmapIndex[idx + 1] - bitmapIndex[idx];
+		int bestColor = 0;
+		for (int i = 0; i < colorCount; ++i)
+		{
+			if (bitmaps[bitmapIndex[idx] + i])
+			{
+				bestColor = i;
+				break;
+			}
+		}
+		buffer[idx] = bestColor;
+		filledBuffer[idx] = true;
+	}
+	else
+	{
+		*uncoloredFlag = true;
+	}
+}
+
 /**
  * Print the graph (verbose = 1 for "verbose print")
  * @param verbose print the complete graph
@@ -154,7 +193,7 @@ void printColoring(Coloring* col, GraphStruct* graphStruct, bool verbose) {
 	}
 }
 
-Coloring* Colorer::color(Graph& graph)
+Coloring* global::color(Graph& graph, uint* d_priorities)
 {
 	// Init
 	int n = graph.GetNodeCount();
@@ -176,9 +215,6 @@ Coloring* Colorer::color(Graph& graph)
 	CHECK(cudaMalloc((void**)&(d_coloredNodes), n * sizeof(bool)));
 	cudaMemcpy(d_coloring, coloring, n * sizeof(uint), cudaMemcpyHostToDevice);
 	cudaMemcpy(d_coloredNodes, coloredNodes, n * sizeof(bool), cudaMemcpyHostToDevice);
-
-	// Generate priorities using degrees
-	uint* d_priorities = calculatePriority(graph, d_graphStruct);
 
 	// Calculate inbound counters
 	dim3 blockDim(THREADxBLOCK);
@@ -255,8 +291,4 @@ Coloring* Colorer::color(Graph& graph)
 	coloringStruct->coloredNodes = coloredNodes;
 	coloringStruct->iterationCount = iterationCount;
 	return coloringStruct;
-}
-
-Colorer::~Colorer()
-{
 }

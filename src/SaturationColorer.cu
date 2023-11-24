@@ -4,54 +4,6 @@
 #include "utils/common.h"
 #include <cooperative_groups.h>
 
-__global__ void colorSaturation(bool* isColored, GraphStruct* graphStruct, uint* buffer, bool* filledBuffer, bool* bitmaps, uint* bitmapIndex, uint* priorities, bool* uncoloredFlag)
-{
-	uint idx = threadIdx.x + blockDim.x * blockIdx.x;
-
-	if (idx >= graphStruct->nodeCount)
-		return;
-
-	if (isColored[idx])
-		return;
-
-	uint offset = graphStruct->neighIndex[idx];
-	uint deg = graphStruct->neighIndex[idx + 1] - graphStruct->neighIndex[idx];
-	/*if (idx == 3 || idx == 114) {
-		printf("id: %d, priority: %d\n", idx, priorities[idx]);
-	}*/
-
-	bool candidate = true;
-	for (uint j = 0; j < deg; j++) {
-		uint neighID = graphStruct->neighs[offset + j];
-
-		if (!isColored[neighID] &&
-			((priorities[idx] < priorities[neighID]) || ((priorities[idx] == priorities[neighID]) && idx < neighID))) {
-			candidate = false;
-		}
-	}
-	if (candidate) {
-		/*if (idx == 3 || idx == 114) {
-			printf("id: %d, CANDIDATE\n", idx);
-		}*/
-		int colorCount = bitmapIndex[idx + 1] - bitmapIndex[idx];
-		int bestColor = 0;
-		for (int i = 0; i < colorCount; ++i)
-		{
-			if (bitmaps[bitmapIndex[idx] + i])
-			{
-				bestColor = i;
-				break;
-			}
-		}
-		buffer[idx] = bestColor;
-		filledBuffer[idx] = true;
-	}
-	else
-	{
-		*uncoloredFlag = true;
-	}
-}
-
 __global__ void applyBufferSaturation(uint* coloring, bool* isColored, GraphStruct* graphStruct, uint* buffer,
 	bool* filledBuffer, uint* priorities, bool* bitmaps, uint* bitmapIndex, unsigned n)
 {
@@ -77,16 +29,12 @@ __global__ void applyBufferSaturation(uint* coloring, bool* isColored, GraphStru
 	{
 		uint neighID = graphStruct->neighs[offset + i];
 
-
 		int neighColorCount = bitmapIndex[neighID + 1] - bitmapIndex[neighID];
 		if (buffer[idx] < neighColorCount)
 		{
 			bitmaps[bitmapIndex[neighID] + buffer[idx]] = 0;
 		}
 	}
-	/*if (idx == 3 || idx == 114) {
-		printf("id: %d, buffer applied, color: %d, colorCount: %d, Degree: %d\n", idx, coloring[idx], bitmapIndex[idx + 1] - bitmapIndex[idx], graphStruct->neighIndex[idx + 1] - graphStruct->neighIndex[idx]);
-	}*/
 }
 
 __global__ void updatePriorities(bool* isColored, GraphStruct* graphStruct, uint* priorities, bool* bitmaps, uint* bitmapIndex, unsigned n)
@@ -174,9 +122,9 @@ Coloring* SaturationColorer::color(Graph& graph)
 	while (*uncoloredFlag) {
 		*uncoloredFlag = false;
 		cudaMemcpy(d_uncoloredFlag, uncoloredFlag, sizeof(bool), cudaMemcpyHostToDevice);
-		colorSaturation << <gridDim, blockDim >> > (d_isColored, d_graphStruct, buffer, filledBuffer, bitmaps, bitmapIndex, d_priorities, d_uncoloredFlag);
+		colorWithoutInbounds <<<gridDim, blockDim >>> (d_isColored, d_graphStruct, buffer, filledBuffer, bitmaps, bitmapIndex, d_priorities, d_uncoloredFlag);
 		cudaDeviceSynchronize();
-		applyBufferSaturation << <gridDim, blockDim >> > (
+		applyBufferSaturation <<<gridDim, blockDim >>> (
 			d_coloring, d_isColored, d_graphStruct, buffer, filledBuffer, d_priorities, bitmaps, bitmapIndex, n);
 		cudaDeviceSynchronize();
 		updatePriorities << <gridDim, blockDim >> > (d_isColored, d_graphStruct, d_priorities, bitmaps, bitmapIndex, n);

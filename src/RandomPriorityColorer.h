@@ -1,12 +1,11 @@
 #pragma once
 #include "Colorer.h"
 
-class RandomPriorityColorer : Colorer
+__global__ void InitRandomPriorities(uint seed, curandState_t* states, uint* priorities, uint n);
+
+namespace RandomPriorityColorer
 {
-
-private:
 	uint* calculatePriority(Graph& graph, GraphStruct* d_graphStruct);
-
-public:
 	Coloring* color(Graph& graph);
 };
+

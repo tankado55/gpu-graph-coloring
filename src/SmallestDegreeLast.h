@@ -1,12 +1,10 @@
 #pragma once
 #include "Colorer.h"
 
-class SmallestDegreeLast : Colorer
+__global__ void assignPrioritySmallestDesgreeLast(uint* priorities, GraphStruct* graphStruct, double avgDeg, uint priority, int* remainingCount, int* sumDeg);
+
+namespace SmallestDegreeLast
 {
-
-private:
 	uint* calculatePriority(Graph& graph, GraphStruct* d_graphStruct);
-
-public:
 	Coloring* color(Graph& graph);
-};
+}

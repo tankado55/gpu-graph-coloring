@@ -6,14 +6,6 @@
 using namespace std;
 
 /**
- * Set the CUDA Unified Memory for nodes and edges
- * @param memType node or edge memory type
- */
-
-
-
-
-/**
  * Print the graph on device (verbose = 1 for "verbose print")
  * @param verbose print the complete graph
  */
