@@ -15,7 +15,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <CudaCompile Include="src\main.cu" />
+    <CudaCompile Include="src\main.cpp" />
     <CudaCompile Include="src\Colorer.cu" />
     <CudaCompile Include="src\graph\graph.cu">
       <Filter>Source Files</Filter>

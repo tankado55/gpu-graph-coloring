@@ -3,7 +3,7 @@
 #include <iostream>
 #include "utils/common.h"
 #include <cooperative_groups.h>
-#include "colorer.h"
+#include "Colorer.h"
 
 __global__ void calculateInbounds(GraphStruct* graphStruct, unsigned int* inboundCounts, unsigned int* priorities, int n) {
 	uint idx = blockIdx.x * blockDim.x + threadIdx.x;
