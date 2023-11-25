@@ -16,7 +16,6 @@
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="src\main.cu" />
-    <CudaCompile Include="src\graph\graph_d.cu" />
     <CudaCompile Include="src\Colorer.cu" />
     <CudaCompile Include="src\graph\graph.cu">
       <Filter>Source Files</Filter>
@@ -36,9 +35,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\graph\graph.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\graph\graph_d.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\utils\ColoringValidator.h">

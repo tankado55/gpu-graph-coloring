@@ -1,7 +1,6 @@
 ﻿
 #include "device_launch_parameters.h"
 #include <iostream>
-#include "graph/graph_d.h"
 #include "utils/common.h"
 #include <cooperative_groups.h>
 #include "colorer.h"
@@ -13,9 +12,6 @@ __global__ void calculateInbounds(GraphStruct* graphStruct, unsigned int* inboun
 		return;
 
 	uint degree = graphStruct->neighIndex[idx + 1] - graphStruct->neighIndex[idx];
-	//printf("node(%d [myDegree: %d] \n", idx, degree);
-
-	//inboundCounts[idx] = 0;
 	for (uint i = 0; i < degree; ++i)
 	{
 		uint neighID = graphStruct->neighs[graphStruct->neighIndex[idx] + i];
@@ -170,26 +166,6 @@ __global__ void colorWithoutInbounds(bool* isColored, GraphStruct* graphStruct, 
 	else
 	{
 		*uncoloredFlag = true;
-	}
-}
-
-/**
- * Print the graph (verbose = 1 for "verbose print")
- * @param verbose print the complete graph
- */
-void printColoring(Coloring* col, GraphStruct* graphStruct, bool verbose) {
-	unsigned n = graphStruct->nodeCount;
-	std::cout << "** Graph (num node: " << n << ", num edges: " << graphStruct->edgeCount << ")" << std::endl;
-	std::cout << "** Coloring (num colors: " << col->iterationCount + 1 << ")" << std::endl;
-	if (verbose) {
-		for (uint i = 0; i <= col->iterationCount; i++) {
-			std::cout << "   color(" << i << ")" << "-> ";
-			for (uint j = 0; j < n; j++)
-				if (col->coloring[j] == i)
-					std::cout << j << " ";
-			std::cout << "\n";
-		}
-		std::cout << "\n";
 	}
 }
 

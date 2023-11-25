@@ -145,7 +145,6 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </CudaCompile>
     <CudaCompile Include="src\main.cu" />
-    <CudaCompile Include="src\graph\graph_d.cu" />
     <CudaCompile Include="src\RandomPriorityColorer.cu" />
     <CudaCompile Include="src\SaturationColorer.cu" />
     <CudaCompile Include="src\SmallestDegreeLast.cu" />
@@ -161,7 +160,6 @@
     <ClInclude Include="src\utils\ColoringValidator.h" />
     <ClInclude Include="src\utils\common.h" />
     <ClInclude Include="src\graph\graph.h" />
-    <ClInclude Include="src\graph\graph_d.h" />
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="src\graph\graph.cu">
