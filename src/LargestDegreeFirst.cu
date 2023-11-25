@@ -23,7 +23,7 @@ uint* LargestDegreeFirst::calculatePriority(Graph& graph, GraphStruct* d_graphSt
 Coloring* LargestDegreeFirst::color(Graph& graph)
 {
 	GraphStruct* d_graphStruct;
-	graph.copyToDevice(d_graphStruct);
+	graph.getDeviceStruct(d_graphStruct);
 	uint* d_priorities = calculatePriority(graph, d_graphStruct);
 	Coloring* coloring = global::color(graph, d_priorities);
 	cudaFree(d_priorities);

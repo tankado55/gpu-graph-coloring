@@ -32,7 +32,7 @@ public:
 	~Graph();
 	void Init();
 	void ReadFromMtxFile(const char* mtx);
-	void copyToDevice(GraphStruct*& dest);
+	void getDeviceStruct(GraphStruct*& dest);
 	void randGraph(float, std::default_random_engine&, unsigned);  // generate an Erdos random graph
 	void print(bool);
 	GraphStruct* getStruct() {return graphStruct;}

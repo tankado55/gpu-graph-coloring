@@ -46,7 +46,7 @@ Coloring* IncidenceColorer::color(Graph& graph)
 
 	std::cout << "Copying graph to device ..." << std::endl;
 	GraphStruct* d_graphStruct;
-	graph.copyToDevice(d_graphStruct);
+	graph.getDeviceStruct(d_graphStruct);
 
 	// Alloc and Init returning struct
 	double start = seconds();

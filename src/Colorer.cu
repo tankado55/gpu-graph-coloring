@@ -5,7 +5,6 @@
 #include <cooperative_groups.h>
 #include "colorer.h"
 
-//TODO: evita atomic add facendo il confronto al contrario
 __global__ void calculateInbounds(GraphStruct* graphStruct, unsigned int* inboundCounts, unsigned int* priorities, int n) {
 	uint idx = blockIdx.x * blockDim.x + threadIdx.x;
 	if (idx >= n)
@@ -15,36 +14,23 @@ __global__ void calculateInbounds(GraphStruct* graphStruct, unsigned int* inboun
 	for (uint i = 0; i < degree; ++i)
 	{
 		uint neighID = graphStruct->neighs[graphStruct->neighIndex[idx] + i];
-		if (priorities[idx] > priorities[neighID])
-		{
-			atomicAdd(&inboundCounts[neighID], 1);
-		}
-		else if (priorities[idx] == priorities[neighID] && idx > neighID)
-		{
-			atomicAdd(&inboundCounts[neighID], 1);
-		}
+		if ((priorities[idx] < priorities[neighID]) ||
+				(priorities[idx] == priorities[neighID] && idx < neighID))
+			inboundCounts[idx] += 1;
 	}
 }
 
 __global__ void colorWithInboundCountersBitmaps(uint* coloring, bool* coloredNodes, GraphStruct* graphStruct, uint* inboundCounts, uint* buffer, bool* filledBuffer, bool* bitmaps, uint* bitmapIndex, bool* uncoloredFlag)
 {
 	uint idx = threadIdx.x + blockDim.x * blockIdx.x;
-	//printf("GPU - I'm %d, test: %d\n", idx, *uncoloredFlag);
 	if (idx >= graphStruct->nodeCount)
 		return;
-	//printf("GPU - I'm %d, colored?: %d\n", idx, coloredNodes[idx]);
 	if (coloredNodes[idx])
 		return;
 
-	//printf("GPU - I'm %d, myInbound: %d\n", idx, inboundCounts[idx]);
-
-	//if (idx == 8984)
-	//	printf("uncolored: %d, still: %d\n", idx, inboundCounts[idx]);
-	if (inboundCounts[idx] == 0) // Ready node
+	if (inboundCounts[idx] <= 0) // Ready node
 	{
 		int colorCount = bitmapIndex[idx + 1] - bitmapIndex[idx];
-		//if (idx == 18836)
-		//	printf("I'm %d, total colors: %d\n", idx, colorCount);
 
 		int bestColor = colorCount;
 		for (int i = 0; i < colorCount; ++i)
@@ -52,14 +38,11 @@ __global__ void colorWithInboundCountersBitmaps(uint* coloring, bool* coloredNod
 			if (bitmaps[bitmapIndex[idx] + i])
 			{
 				bestColor = i;
-				//if (idx == 18836)
-				//	printf("I'm: %d, ---------best color: %d\n", idx, bestColor);
 				break;
 			}
 		}
 		buffer[idx] = bestColor;
 		filledBuffer[idx] = true;
-		//printf("I'm %d, filled buffer: %d\n", idx, bestColor);
 	}
 	else
 	{
@@ -70,7 +53,6 @@ __global__ void colorWithInboundCountersBitmaps(uint* coloring, bool* coloredNod
 __global__ void applyBufferWithInboundCountersBitmaps(uint* coloring, bool* coloredNodes, GraphStruct* graphStruct, unsigned* priorities, unsigned* inboundCounts, unsigned* buffer, bool* filledBuffer, bool* bitmaps, uint* bitmapIndex)
 {
 	uint idx = threadIdx.x + blockDim.x * blockIdx.x;
-
 	if (idx >= graphStruct->nodeCount)
 		return;
 
@@ -87,55 +69,31 @@ __global__ void applyBufferWithInboundCountersBitmaps(uint* coloring, bool* colo
 	{
 		uint neighID = graphStruct->neighs[offset + i];
 
-		if (priorities[idx] > priorities[neighID])
+		if ((priorities[idx] > priorities[neighID]) ||
+				(priorities[idx] == priorities[neighID] && idx > neighID))
 		{
 			atomicAdd(&inboundCounts[neighID], -1);
 			int colorCount = bitmapIndex[neighID + 1] - bitmapIndex[neighID];
 			if (buffer[idx] < colorCount)
 				bitmaps[bitmapIndex[neighID] + buffer[idx]] = 0;
 		}
-		else if (priorities[idx] == priorities[neighID] && idx > neighID)
-		{
-			atomicAdd(&inboundCounts[neighID], -1);
-			int colorCount = bitmapIndex[neighID + 1] - bitmapIndex[neighID];
-			if (buffer[idx] < colorCount)
-				bitmaps[bitmapIndex[neighID] + buffer[idx]] = 0;
-
-			//if (neighID == 18836) {
-			//	printf("I'm: %d, ---------removed arc to: %d, still: %d\n", idx, neighID, inboundCounts[neighID]);
-			//	printf("%d, %d, %d, %d, %d\n", bitmaps[bitmapIndex[neighID] + 0], bitmaps[bitmapIndex[neighID] + 1], bitmaps[bitmapIndex[neighID] + 2], bitmaps[bitmapIndex[neighID] + 3], bitmaps[bitmapIndex[neighID] + 4]);
-			//}
-		}
-		else {
-			//if (neighID == 3)
-			//	printf("I'm: %d, ---------NOT removed arc to: %d, still: %d\n", idx, neighID, inboundCounts[neighID]);
-		}
-
 	}
-	//if (idx == 18836)
-	//	printf("I'm: %d, colored: %d \n", idx, buffer[idx]);
 
 	coloring[idx] = buffer[idx];
 	coloredNodes[idx] = true;
 	filledBuffer[idx] = false;
-	//printf("buffer applied: from %d, color: %d\n", idx, coloring[idx]);
 }
 
 __global__ void colorWithoutInbounds(bool* isColored, GraphStruct* graphStruct, uint* buffer, bool* filledBuffer, bool* bitmaps, uint* bitmapIndex, uint* priorities, bool* uncoloredFlag)
 {
 	uint idx = threadIdx.x + blockDim.x * blockIdx.x;
-
 	if (idx >= graphStruct->nodeCount)
 		return;
-
 	if (isColored[idx])
 		return;
 
 	uint offset = graphStruct->neighIndex[idx];
 	uint deg = graphStruct->neighIndex[idx + 1] - graphStruct->neighIndex[idx];
-	/*if (idx == 3 || idx == 114) {
-		printf("id: %d, priority: %d\n", idx, priorities[idx]);
-	}*/
 
 	bool candidate = true;
 	for (uint j = 0; j < deg; j++) {
@@ -147,9 +105,6 @@ __global__ void colorWithoutInbounds(bool* isColored, GraphStruct* graphStruct, 
 		}
 	}
 	if (candidate) {
-		/*if (idx == 3 || idx == 114) {
-			printf("id: %d, CANDIDATE\n", idx);
-		}*/
 		int colorCount = bitmapIndex[idx + 1] - bitmapIndex[idx];
 		int bestColor = 0;
 		for (int i = 0; i < colorCount; ++i)
@@ -174,12 +129,10 @@ Coloring* global::color(Graph& graph, uint* d_priorities)
 	// Init
 	int n = graph.GetNodeCount();
 	int edgeCount = graph.GetEdgeCount();
-
-	std::cout << "Copying graph to device ..." << std::endl;
 	GraphStruct* d_graphStruct;
-	graph.copyToDevice(d_graphStruct);
+	graph.getDeviceStruct(d_graphStruct);
 
-	// Alloc and Init returning struct
+	// coloring struct init
 	double start = seconds();
 	uint* coloring = (uint*)malloc(n * sizeof(uint));
 	bool* coloredNodes = (bool*)malloc(n * sizeof(bool));
@@ -201,17 +154,15 @@ Coloring* global::color(Graph& graph, uint* d_priorities)
 	calculateInbounds << <gridDim, blockDim >> > (d_graphStruct, inboundCounts, d_priorities, n);
 	cudaDeviceSynchronize();
 
-	// inizialize bitmaps, every node has a bitmap with a length of inbound edges + 1 TODO: alloc on gpu
-	// vision: allocare tutto in un array come al solito ma serve la prefix sum
-	// alternativa1: sequenziale O(n)
+	// inizialize bitmaps, every node has a bitmap with a length of inbound edges + 1
 	uint bitCount = (n + (int)(edgeCount + 1) / 2);
 	uint* bitmapIndex = (uint*)malloc((n + 1) * sizeof(uint));
 	uint* h_InboundCounts;
 	h_InboundCounts = (uint*)malloc(n * sizeof(uint));
 	cudaMemcpy(h_InboundCounts, inboundCounts, n * sizeof(uint), cudaMemcpyDeviceToHost);
 	bitmapIndex[0] = 0;
-	for (int i = 1; i < n + 1; i++)
-		bitmapIndex[i] = bitmapIndex[i - 1] + h_InboundCounts[i - 1] + 1; //the inbound should be only in gpu mem TODO: parallelize with scan
+	for (int i = 1; i < n + 1; i++) // can be done in parallel with scan algorithm
+		bitmapIndex[i] = bitmapIndex[i - 1] + h_InboundCounts[i - 1] + 1;
 	bool* d_bitmaps;
 	uint* d_bitmapIndex;
 	CHECK(cudaMalloc((void**)&d_bitmaps, bitCount * sizeof(bool)));
@@ -219,6 +170,7 @@ Coloring* global::color(Graph& graph, uint* d_priorities)
 	cudaMemset(d_bitmaps, 1, bitCount * sizeof(bool));
 	cudaMemcpy(d_bitmapIndex, bitmapIndex, (n + 1) * sizeof(uint), cudaMemcpyHostToDevice);
 	delete(bitmapIndex);
+	delete(h_InboundCounts);
 
 	// Alloc buffer needed to synchronize the coloring
 	unsigned* buffer;
@@ -251,13 +203,6 @@ Coloring* global::color(Graph& graph, uint* d_priorities)
 	stop = seconds();
 	std::cout << "Processing: " << elapsedTime(start, stop) << std::endl;
 
-
-	// Free
-	cudaFree(d_priorities);
-	cudaFree(inboundCounts);
-	cudaFree(buffer);
-	cudaFree(filledBuffer);
-
 	//cudaMemcpy(coloring, d_coloring, sizeof(Coloring), cudaMemcpyDeviceToHost);
 	cudaMemcpy(coloring, d_coloring, n * sizeof(uint), cudaMemcpyDeviceToHost);
 	cudaMemcpy(coloredNodes, d_coloredNodes, n * sizeof(bool), cudaMemcpyDeviceToHost);
@@ -266,5 +211,14 @@ Coloring* global::color(Graph& graph, uint* d_priorities)
 	coloringStruct->coloring = coloring;
 	coloringStruct->coloredNodes = coloredNodes;
 	coloringStruct->iterationCount = iterationCount;
+
+	// Free
+	cudaFree(inboundCounts);
+	cudaFree(buffer);
+	cudaFree(filledBuffer);
+	cudaFree(d_coloring);
+	cudaFree(d_coloredNodes);
+	cudaFree(d_bitmaps);
+	cudaFree(d_bitmapIndex);
 	return coloringStruct;
 }

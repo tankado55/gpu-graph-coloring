@@ -112,7 +112,7 @@ void Graph::ReadFromMtxFile(const char* mtx) {
 	}
 }
 
-void Graph::copyToDevice(GraphStruct*& dest)
+void Graph::getDeviceStruct(GraphStruct*& dest)
 {
 	if (!deviceAllocated)
 	{
