@@ -32,7 +32,7 @@ int main(int argc, char* argv[]) {
 	}
 
 	Graph graph;
-	graph.ReadFromMtxFile(path);
+	graph.readFromMtxFile(path);
 	GraphStruct* graphStruct = graph.getStruct();
 
 	printf("start, edgeCount: %d\n", graphStruct->edgeCount);

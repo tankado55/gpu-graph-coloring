@@ -85,9 +85,7 @@ Coloring* SaturationColorer::color(Graph& graph)
 	cudaMalloc((void**)&d_priorities, n * sizeof(uint));
 	cudaMemset(d_priorities, 0, n * sizeof(uint));
 
-	// inizialize bitmaps, every node has a bitmap with a length of inbound edges + 1 TODO: alloc on gpu
-	// vision: allocare tutto in un array come al solito ma serve la prefix sum
-	// alternativa1: sequenziale O(n)
+	// inizialize bitmaps
 	bool* bitmaps;
 	uint bitCount = (n + edgeCount);
 	CHECK(cudaMallocManaged(&(bitmaps), bitCount * sizeof(bool)));

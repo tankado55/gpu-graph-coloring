@@ -43,8 +43,6 @@ Coloring* IncidenceColorer::color(Graph& graph)
 	int edgeCount = graph.GetEdgeCount();
 	dim3 blockDim(THREADxBLOCK);
 	dim3 gridDim((n + blockDim.x - 1) / blockDim.x, 1, 1);
-
-	std::cout << "Copying graph to device ..." << std::endl;
 	GraphStruct* d_graphStruct;
 	graph.getDeviceStruct(d_graphStruct);
 
@@ -66,9 +64,7 @@ Coloring* IncidenceColorer::color(Graph& graph)
 	cudaMalloc((void**)&d_priorities, n * sizeof(uint));
 	cudaMemset(d_priorities, 0, n * sizeof(uint));
 
-	// inizialize bitmaps, every node has a bitmap with a length of inbound edges + 1 TODO: alloc on gpu
-	// vision: allocare tutto in un array come al solito ma serve la prefix sum
-	// alternativa1: sequenziale O(n)
+	// inizialize bitmaps
 	bool* bitmaps;
 	uint bitCount = (n + edgeCount);
 	CHECK(cudaMallocManaged(&(bitmaps), bitCount * sizeof(bool)));
@@ -107,7 +103,7 @@ Coloring* IncidenceColorer::color(Graph& graph)
 		cudaDeviceSynchronize();
 		cudaMemcpy(uncoloredFlag, d_uncoloredFlag, sizeof(bool), cudaMemcpyDeviceToHost);
 		cudaDeviceSynchronize();
-		applyBufferIncidence << <gridDim, blockDim >> > (
+		applyBufferIncidence <<<gridDim, blockDim >>> (
 			d_coloring, d_isColored, d_graphStruct, buffer, filledBuffer, d_priorities, bitmaps, bitmapIndex, n);
 		cudaDeviceSynchronize();
 		cudaMemcpy(uncoloredFlag, d_uncoloredFlag, sizeof(bool), cudaMemcpyDeviceToHost);
@@ -126,9 +122,9 @@ Coloring* IncidenceColorer::color(Graph& graph)
 	coloringStruct->iterationCount = iterationCount;
 
 	// Free
-	cudaFree(d_priorities);
 	cudaFree(buffer);
 	cudaFree(filledBuffer);
+	cudaFree(d_coloring);
 
 	return coloringStruct;
 }

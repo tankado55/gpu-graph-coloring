@@ -31,16 +31,15 @@ public:
 	Graph();
 	~Graph();
 	void Init();
-	void ReadFromMtxFile(const char* mtx);
+	void readFromMtxFile(const char* mtx);
 	void getDeviceStruct(GraphStruct*& dest);
-	void randGraph(float, std::default_random_engine&, unsigned);  // generate an Erdos random graph
+	void randGraph(float, std::default_random_engine&, unsigned);
 	void print(bool);
 	GraphStruct* getStruct() {return graphStruct;}
 	int GetEdgeCount();
 	uint GetNodeCount();
 	double GetAvgDeg();
 	void BuildRandomDAG(Graph&);
-	void getLDFDag(GraphStruct*);
 	void BuildLDFDagV2(Graph&);
 	void AllocDagOnDevice(GraphStruct*);
 

@@ -2,7 +2,7 @@
 #include "SmallestDegreeLast.h"
 #include "utils/common.h"
 
-__global__ void assignPrioritySmallestDesgreeLast(uint* priorities, GraphStruct* graphStruct, double avgDeg, uint priority, int* remainingCount, int* sumDeg)
+__global__ void assignPrioritySmallestDesgreeLast(uint* priorities, GraphStruct* graphStruct, double threshold, uint priority, int* remainingCount, int* sumDeg)
 {
     uint idx = threadIdx.x + blockDim.x * blockIdx.x;
 	if (idx >= graphStruct->nodeCount)
@@ -23,11 +23,10 @@ __global__ void assignPrioritySmallestDesgreeLast(uint* priorities, GraphStruct*
 		}
 	}
 
-    if (currentDeg <= avgDeg)
+    if (currentDeg <= threshold)
     {
         priorities[idx] = priority;
         atomicSub(remainingCount, 1);
-        //atomicSub(sumDeg, deg); // not properly correct, possible solution: keep a buffer of current deg and sum it in parallel after each step
     }
 }
 
@@ -38,7 +37,7 @@ uint* SmallestDegreeLast::calculatePriority(Graph& graph, GraphStruct* d_graphSt
     dim3 blockDim(THREADxBLOCK);
     dim3 gridDim((n + blockDim.x - 1) / blockDim.x, 1, 1);
 
-    double avgDeg = 0;
+    double threshold = 0;
     
     int* sumDeg;
     CHECK(cudaMallocManaged(&(sumDeg), sizeof(int)));
@@ -52,20 +51,21 @@ uint* SmallestDegreeLast::calculatePriority(Graph& graph, GraphStruct* d_graphSt
     cudaMalloc((void**)&d_priorities, graph.GetNodeCount() * sizeof(uint));
 
     int i = 1;
-    while (*remainingCount > 0) // TODO: if I don't use the average I can use a flag
+    while (*remainingCount > 0)
     {
-        //avgDeg = *sumDeg / *remainingCount;
-		avgDeg++;
+		threshold++;
 		while (true)
 		{
 			int prevRemainingCount = *remainingCount;
-			assignPrioritySmallestDesgreeLast << <gridDim, blockDim >> > (d_priorities, d_graphStruct, avgDeg, i, remainingCount, sumDeg);
+			assignPrioritySmallestDesgreeLast << <gridDim, blockDim >> > (d_priorities, d_graphStruct, threshold, i, remainingCount, sumDeg);
 			cudaDeviceSynchronize();
 			if (prevRemainingCount == *remainingCount)
 				break;
 			++i;
 		}
     }
+
+    cudaFree(sumDeg);
     return d_priorities;
 }
 

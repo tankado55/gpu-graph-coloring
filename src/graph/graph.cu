@@ -32,7 +32,7 @@ void Graph::Init() {
 	graphStruct->neighIndex = graphStruct->neighs = NULL;
 }
 
-void Graph::ReadFromMtxFile(const char* mtx) {
+void Graph::readFromMtxFile(const char* mtx) {
 	printf("Reading .mtx input file %s\n", mtx);
 	std::ifstream cfile;
 	cfile.open(mtx);
@@ -120,7 +120,6 @@ void Graph::getDeviceStruct(GraphStruct*& dest)
 		CHECK(cudaMalloc((void**)&d_graphStruct, sizeof(GraphStruct)));
 		CHECK(cudaMemcpy(&d_graphStruct->nodeCount, &graphStruct->nodeCount, sizeof(int), cudaMemcpyHostToDevice));
 		CHECK(cudaMemcpy(&d_graphStruct->edgeCount, &graphStruct->edgeCount, sizeof(int), cudaMemcpyHostToDevice));
-
 		
 		CHECK(cudaMalloc((void**)&neighIndexTemp, (graphStruct->nodeCount + 1) * sizeof(uint)));
 		CHECK(cudaMalloc((void**)&neighsTemp, graphStruct->edgeCount * sizeof(uint)));
@@ -243,29 +242,6 @@ void Graph::BuildLDFDagV2(Graph& dag) //TODO: check all the code
 		dag.graphStruct->neighIndex[i + 1] = k;
 	}
 }
-
-void Graph::getLDFDag(GraphStruct* res)
-{
-	res->nodeCount = graphStruct->nodeCount;
-	res->edgeCount = (graphStruct->edgeCount + 1) / 2;
-	int k = 0;
-	for (int i = 0; i < graphStruct->nodeCount; ++i)
-	{
-		int degree = deg(i);
-		for (int j = 0; j < degree; ++j)
-		{
-			unsigned int neighID = graphStruct->neighs[graphStruct->neighIndex[i] + j];
-			unsigned int neighDegree = deg(neighID);
-			if (degree > neighDegree || (degree == neighDegree && i > neighID))
-			{
-				res->neighs[k] = neighID;
-				++k;
-			}
-		}
-		res->neighIndex[i + 1] = k;
-	}
-}
-
 
 
 int Graph::GetEdgeCount()
