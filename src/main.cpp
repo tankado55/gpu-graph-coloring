@@ -11,6 +11,8 @@
 #include "RandomPriorityColorer.h"
 #include "LargestDegreeFirst.h"
 
+double stopwatch::time = 0.0f;
+
 int main(int argc, char* argv[]) {
 	// Random generated graph
 	//unsigned int n = 20000;

@@ -78,11 +78,27 @@ inline void device_name() {
 
 inline double seconds() {
     return clock();
-
 }
 
 inline double elapsedTime(double start, double end) {
     return ((double)(end - start)) / CLOCKS_PER_SEC;
+}
+
+namespace stopwatch
+{
+    extern double time;
+}
+
+inline void setStartTime()
+{
+    stopwatch::time = clock();
+}
+
+inline double getLapTime() {
+    double now = clock();
+    double lap = ((double)now - stopwatch::time) / CLOCKS_PER_SEC;
+    stopwatch::time = now;
+    return lap;
 }
 
 typedef unsigned long ulong;

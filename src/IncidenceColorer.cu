@@ -1,7 +1,6 @@
 #include <iostream>
 #include "IncidenceColorer.h"
 #include "device_launch_parameters.h"
-#include "utils/common.h"
 #include <cooperative_groups.h>
 
 __global__ void applyBufferIncidence(uint* coloring, bool* isColored, GraphStruct* graphStruct, uint* buffer, 
@@ -38,6 +37,8 @@ __global__ void applyBufferIncidence(uint* coloring, bool* isColored, GraphStruc
 
 Coloring* IncidenceColorer::color(Graph& graph)
 {
+	setStartTime();
+
 	// Init
 	unsigned n = graph.GetNodeCount();
 	int edgeCount = graph.GetEdgeCount();
@@ -93,8 +94,8 @@ Coloring* IncidenceColorer::color(Graph& graph)
 	*uncoloredFlag = true;
 	bool* d_uncoloredFlag;
 	cudaMalloc((void**)&d_uncoloredFlag, sizeof(bool));
-	double stop = seconds();
-	std::cout << "Initialization: " << elapsedTime(start, stop) << std::endl;
+	double lap = getLapTime();
+	std::cout << "Initialization: " << lap << std::endl;
 	start = seconds();
 	while (*uncoloredFlag) {
 		*uncoloredFlag = false;
@@ -110,8 +111,8 @@ Coloring* IncidenceColorer::color(Graph& graph)
 		cudaDeviceSynchronize();
 		iterationCount++;
 	}
-	stop = seconds();
-	std::cout << "Processing: " << elapsedTime(start, stop) << std::endl;
+	lap = getLapTime();
+	std::cout << "Processing: " << lap << std::endl;
 
 	//copy and build results
 	cudaMemcpy(coloring, d_coloring, n * sizeof(uint), cudaMemcpyDeviceToHost);

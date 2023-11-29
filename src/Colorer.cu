@@ -1,7 +1,6 @@
 ﻿
 #include "device_launch_parameters.h"
 #include <iostream>
-#include "utils/common.h"
 #include <cooperative_groups.h>
 #include "Colorer.h"
 
@@ -133,7 +132,6 @@ Coloring* global::color(Graph& graph, uint* d_priorities)
 	graph.getDeviceStruct(d_graphStruct);
 
 	// coloring struct init
-	double start = seconds();
 	uint* coloring = (uint*)malloc(n * sizeof(uint));
 	bool* coloredNodes = (bool*)malloc(n * sizeof(bool));
 	memset(coloring, 0, n * sizeof(uint));
@@ -180,15 +178,13 @@ Coloring* global::color(Graph& graph, uint* d_priorities)
 	cudaMalloc((void**)&filledBuffer, n * sizeof(bool));
 	cudaMemset(filledBuffer, 0, n * sizeof(bool));
 
-	// Color TODO: tieni il flag sulla gpu e itera con gli stream
 	int iterationCount = 0;
 	bool* uncoloredFlag = (bool*)malloc(sizeof(bool));
 	*uncoloredFlag = true;
 	bool* d_uncoloredFlag;
 	cudaMalloc((void**)&d_uncoloredFlag, sizeof(bool));
-	double stop = seconds();
-	std::cout << "Initialization: " << elapsedTime(start, stop) << std::endl;
-	start = seconds();
+	double lap = getLapTime();
+	std::cout << "Initialization: " << lap << std::endl;
 	while (*uncoloredFlag) {
 		*uncoloredFlag = false;
 		cudaMemcpy(d_uncoloredFlag, uncoloredFlag, sizeof(bool), cudaMemcpyHostToDevice);
@@ -200,8 +196,8 @@ Coloring* global::color(Graph& graph, uint* d_priorities)
 		cudaDeviceSynchronize();
 		iterationCount++;
 	}
-	stop = seconds();
-	std::cout << "Processing: " << elapsedTime(start, stop) << std::endl;
+	lap = getLapTime();
+	std::cout << "Processing: " << lap << std::endl;
 
 	//cudaMemcpy(coloring, d_coloring, sizeof(Coloring), cudaMemcpyDeviceToHost);
 	cudaMemcpy(coloring, d_coloring, n * sizeof(uint), cudaMemcpyDeviceToHost);

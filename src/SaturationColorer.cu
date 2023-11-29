@@ -57,6 +57,8 @@ __global__ void updatePriorities(bool* isColored, GraphStruct* graphStruct, uint
 
 Coloring* SaturationColorer::color(Graph& graph)
 {
+	setStartTime();
+
 	// Init
 	unsigned n = graph.GetNodeCount();
 	int edgeCount = graph.GetEdgeCount();
@@ -114,8 +116,8 @@ Coloring* SaturationColorer::color(Graph& graph)
 	*uncoloredFlag = true;
 	bool* d_uncoloredFlag;
 	cudaMalloc((void**)&d_uncoloredFlag, sizeof(bool));
-	double stop = seconds();
-	std::cout << "Initialization: " << elapsedTime(start, stop) << std::endl;
+	double lap = getLapTime();
+	std::cout << "Initialization: " << lap << std::endl;
 	start = seconds();
 	while (*uncoloredFlag) {
 		*uncoloredFlag = false;
@@ -131,8 +133,8 @@ Coloring* SaturationColorer::color(Graph& graph)
 		cudaDeviceSynchronize();
 		iterationCount++;
 	}
-	stop = seconds();
-	std::cout << "Processing: " << elapsedTime(start, stop) << std::endl;
+	lap = getLapTime();
+	std::cout << "Processing: " << lap << std::endl;
 
 	//copy and build results
 	cudaMemcpy(coloring, d_coloring, n * sizeof(uint), cudaMemcpyDeviceToHost);
