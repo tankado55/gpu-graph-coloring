@@ -99,7 +99,7 @@ Coloring* SaturationColorer::color(Graph& graph)
 	for (int i = 1; i < n + 1; i++)
 	{
 		int prevDeg = graphStruct->neighIndex[i] - graphStruct->neighIndex[i - 1];
-		bitmapIndex[i] = bitmapIndex[i - 1] + prevDeg + 1; //the inbound should be only in gpu mem TODO: parallelize with scan
+		bitmapIndex[i] = bitmapIndex[i - 1] + prevDeg + 1;
 	}
 
 	// Alloc buffer needed to synchronize the coloring

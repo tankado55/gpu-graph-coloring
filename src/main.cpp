@@ -25,7 +25,7 @@ int main(int argc, char* argv[]) {
 
 	if (argc < 3) {
 		path = "inputData/soc-youtube-snap/soc-youtube-snap.mtx";
-		mod = 3;
+		mod = 0;
 	}
 	else
 	{

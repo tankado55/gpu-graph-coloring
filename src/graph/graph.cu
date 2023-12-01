@@ -221,7 +221,7 @@ void Graph::BuildRandomDAG(Graph& dag)
 	delete[] priorities;
 }
 
-void Graph::BuildLDFDagV2(Graph& dag) //TODO: check all the code
+void Graph::BuildLDFDagV2(Graph& dag)
 {
 	dag.graphStruct->nodeCount = graphStruct->nodeCount;
 	dag.graphStruct->edgeCount = (graphStruct->edgeCount + 1) / 2;

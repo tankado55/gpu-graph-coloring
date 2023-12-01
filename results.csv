@@ -1,1 +1,14 @@
-Graph Name, Algorithm Name, Init Time, Color Time, Colors
+Graph Name, Algorithm Name, Init Time, Color Time, No. Colors, No. Iterations
+soc-youtube-snap, Random, 0.798264, 0.252071, 44, 261
+soc-youtube-snap, Random, 0.795352, 0.281356, 44, 261
+soc-youtube-snap, Random, 0.725842, 0.284001, 44, 261
+soc-youtube-snap, LDF, 0.833243, 0.206839, 32, 261
+soc-youtube-snap, LDF, 0.7297, 0.223767, 32, 261
+soc-youtube-snap, LDF, 0.670228, 0.212497, 32, 261
+soc-youtube-snap, SDL, 2.53524, 0.390344, 26, 842
+soc-youtube-snap, SDL, 2.47359, 0.389781, 26, 842
+soc-youtube-snap, SDL, 2.59351, 0.391529, 26, 842
+
+
+primo grafico:
+y = n di vertici / time
